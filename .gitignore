@@ -1,0 +1,46 @@
+# --- BikeHound: lokale gegevens, NOOIT committen ---
+# Browserprofielen bevatten sessiecookies van je accounts
+data/
+!data/.gitkeep
+# Je echte configuratie (ntfy-topic, eigen fietsbeschrijving)
+config.yaml
+# Eigen foto's van je fiets
+reference/*
+!reference/.gitkeep
+# Logs en databases
+*.log
+*.sqlite
+*.sqlite3
+*.db
+# Secrets
+.env
+.env.*
+*.pem
+*.key
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# --- Playwright ---
+playwright-report/
+test-results/
+
+# --- Editors / OS ---
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
+desktop.ini
