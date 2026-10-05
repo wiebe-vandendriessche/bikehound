@@ -1,0 +1,31 @@
+# BikeHound config, one bike per file.
+bike:
+  stolen_on: 2026-09-20
+  # active_until: 2027-09-20     # optional, default stolen_on + 1 year
+  # frame_number: "WXYZ12345"    # optional, a hit always notifies
+  reference_dir: reference/      # side views with the whole frame + distinctive details
+
+location:
+  postcode: "9000"
+  country: BE
+  lat: 51.05
+  lon: 3.72
+  radius_km: 50
+
+# Opt-in: vinted, leboncoin, facebook (read the README warnings first)
+platforms: [2dehands, marktplaats]
+
+# Any group name. Words in every language the platforms use.
+# Default weights: brand 0.3, model 0.4, anything else 0.1.
+keywords:
+  brand: { words: [cortina] }
+  model: { words: [e-u4, eu4, "e u4"] }
+  color: { words: [felgroen, groen, green, vert], weight: 0.3 }
+
+# A listing notifies when photo score + matched keyword weights >= threshold.
+# Photo score: 0 for a typical bike photo, 0.5 for the closest 1% of listings.
+# Expect around 10 to 20 notifications per 1000 listings; `bikehound check` shows the spread.
+threshold: 0.5
+
+ntfy:
+  url: https://ntfy.sh/{topic}   # the topic name is the secret, `bikehound init` fills it in

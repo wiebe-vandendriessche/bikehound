@@ -1,0 +1,48 @@
+{
+  "hasErrors": false,
+  "totalResultCount": 4,
+  "listings": [
+    {
+      "itemId": "m1000000004",
+      "title": "Cortina E-U4 transportfiets",
+      "description": "Mooie groene fiets, frame wxyz 12345.",
+      "categorySpecificDescription": "Mooie groene fiets, frame wxyz 12345. Ophalen in Gent...",
+      "priceInfo": {"priceCents": 125000, "priceType": "MIN_BID"},
+      "location": {"cityName": "Gent", "countryAbbreviation": "BE", "distanceMeters": 0},
+      "date": "Vandaag",
+      "imageUrls": ["//images.example.test/a.jpg?rule=82"],
+      "pictures": [{"id": 0, "largeUrl": "https://images.example.test/a.jpg?rule=83"}],
+      "categoryId": 451,
+      "vipUrl": "/v/fietsen-en-brommers/elektrische-fietsen/m1000000004-cortina-e-u4"
+    },
+    {
+      "itemId": "m1000000003",
+      "title": "Damesfiets",
+      "description": "Prijs zie beschrijving",
+      "priceInfo": {"priceCents": 0, "priceType": "SEE_DESCRIPTION"},
+      "location": {"cityName": "Melle", "countryAbbreviation": "BE", "distanceMeters": 10000},
+      "date": "Gisteren",
+      "imageUrls": ["//images.example.test/b.jpg?rule=82"],
+      "categoryId": 447,
+      "vipUrl": "/v/fietsen-en-brommers/fietsen-dames-damesfietsen/m1000000003-damesfiets"
+    },
+    {
+      "itemId": "m1000000002",
+      "title": "Racefiets",
+      "priceInfo": {"priceCents": 30000, "priceType": "FIXED"},
+      "location": {"cityName": "Lokeren"},
+      "date": "18 sep 26",
+      "categoryId": 464,
+      "vipUrl": "/v/fietsen-en-brommers/fietsen-racefietsen/m1000000002-racefiets"
+    },
+    {
+      "itemId": "m1000000001",
+      "title": "Kinderfiets",
+      "priceInfo": {"priceType": "FREE"},
+      "location": {},
+      "date": "binnenkort",
+      "categoryId": 1917,
+      "vipUrl": "/v/fietsen-en-brommers/fietsen-kinderfietsjes/m1000000001-kinderfiets"
+    }
+  ]
+}

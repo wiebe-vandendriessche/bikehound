@@ -1,6 +1,7 @@
 # BikeHound architecture
 
-Status: design, agreed 2026-10-05. Nothing here is implemented yet.
+Status: design, agreed 2026-10-05. Implemented: config, store, notify (incl. first-run digest),
+text and photo scoring, CLI (`init`, `check`, `run`), and the 2dehands/Marktplaats source.
 
 ## 1. Purpose and scope
 
@@ -47,11 +48,11 @@ own platform risk.
 | D4 | 2dehands/Marktplaats through their shared JSON API over plain HTTP. Vinted, Leboncoin and Facebook through Playwright with a real Chromium and a persistent profile per platform. Where the page fetches JSON, the source reads that response instead of scraping selectors. | One browser mechanism for the hard platforms; intercepted JSON breaks less often than CSS selectors. |
 | D5 | On a block, CAPTCHA or expired session: skip that platform for this run, notify the user, no retry. | Fail soft and visibly; never escalate. |
 | D6 | One Python module per platform exposing `search()`, registered in a plain dict. | Adding a platform is one file plus one line. No base class, no entry points. |
-| D7 | Photo score from a local embedding model (DINOv2-small via `transformers`), cosine similarity, highest pair across all listing × reference photos. | Free, private, works offline; one good photo is enough. |
+| D7 | Photo score from a local image model (SigLIP2-base via `transformers`, CPU-only torch) on the whole photo, cosine similarity, highest pair across the first 3 listing photos x all reference photos. Rescaled so the measured median of unrelated listings (0.55) maps to 0 and their 99th percentile (0.71) to 0.5. Default `threshold` 0.5. | Free, private, works offline; one good photo is enough. Chosen over DINOv2 by a measured bake-off (below). Rescaling keeps the keyword weights meaningful: `brand + model` (0.7) reaches the threshold, `color` alone does not, the photo alone only for about the closest 1% of listings. |
 | D8 | Text bonus: user-defined keyword groups (brand, model, colour, …) with optional per-group weight, matched as case- and accent-insensitive substrings in title and description. `total = photo_score + Σ matched group weights`. | Strong text evidence (brand + model, or a bright distinctive colour) must lift a listing over the threshold even when the photo doesn't match. |
 | D9 | Frame number found in the text: always notify. | Unambiguous evidence. |
-| D10 | Two searches per platform: *near & broad* (whole bike category, within a radius, newest first) and *far & targeted* (model keywords, nationwide). | Vague listings are caught near home by photo; honest listings far away are caught by text. |
-| D11 | First run backfills to the theft date; later runs only process unseen listing IDs. | No duplicate work, no duplicate notifications. |
+| D10 | Two searches per platform: *near & broad* (bike subcategories only, within a radius, newest first) and *far & targeted* (model keywords, whole category, nationwide). Near runs only on platforms that accept the user's postcode (2dehands for BE, Marktplaats for NL). | Vague listings are caught near home by photo; honest listings far away are caught by text. A foreign postcode is silently ignored, which would turn near into a nationwide flood. |
+| D11 | Paging stops once a page ends before `since`: the theft date on the first run, else the last successful run minus one day. Only unseen listing IDs are scored. Backfill is bounded by the page cap. | No duplicate work, no duplicate notifications. Platforms sort by *bump* date, so already-seen listings fill every page and "stop at a page with nothing new" never triggers. |
 | D12 | Listings without a usable location are kept, not dropped. | Missing a bike is worse than a false positive. |
 | D13 | Notifications through ntfy (one HTTP POST, photo attached, link as click action). A random topic is generated at `init`. | Free, open source, self-hostable, no account, no extra dependency. |
 | D14 | Config is a commented YAML file plus a folder of reference photos. Commands: `init`, `check`, `login`, `run`. | Technical users prefer a documented file over a wizard; `check` gives immediate feedback. |
@@ -60,7 +61,8 @@ own platform risk.
 | D17 | `active_until` (default: theft date + 1 year) ends the search with one final notification. | Protects against forgotten cron jobs; the human decides when the bike is found. |
 | D18 | Tests run on recorded fixtures and pure scoring logic; live checks only via `bikehound check`, never in CI. | Live tests in CI fail on datacenter IPs, not on real breakage. |
 | D19 | Python ≥ 3.14; dependencies: `httpx`, `playwright`, `torch`, `transformers`, `pillow`, `pyyaml`. CLI with `argparse`, config validated with a dataclass. Tooling: `pytest`, `ruff`, `pyproject.toml`. | Most mature ecosystem for browser automation and vision models; no extra layers. |
-| D20 | No background removal or bike cropping in v1. | Add only if backgrounds visibly distort scores in practice. |
+| D20 | No background removal or bike cropping. | Measured: a bike-detector crop added about 0.01 AUC on top of SigLIP2 while more than doubling CPU time per photo. |
+| D21 | The first run sends one digest (all matches sorted by score, split into messages under 4000 bytes) instead of one push per match. | A backfill of a popular model produced 121 matches; ntfy.sh rate-limits after about 60 messages. |
 
 ## 3. Components
 
@@ -131,20 +133,21 @@ With several bikes, each config file gets its own `data/` folder next to it.
    - *near*: bike category, within `radius_km`, newest first;
    - *far*: each word of the `model` group (or the `brand` group if there is no model), no
      distance limit;
-   - pages continue until a page has no unseen listings, the theft date is passed, or the
+   - pages continue until a page ends before `since` (D11), a page comes back short, or the
      page cap is reached;
    - on `Blocked`, record the failure, send a failure notification and continue with the next
      platform.
 4. **Filter.** Drop listings already in `seen`. Where a listing has coordinates and the platform
-   ignored the radius, drop listings beyond `radius_km` (near search only). Keep listings
-   without a location.
+   ignored the radius, drop listings beyond `radius_km` (near search only; 2dehands and
+   Marktplaats apply the radius themselves). Keep listings without a location.
 5. **Score.** For each listing:
    - frame number in the text → match, done;
    - download photos into memory (HTTP, or through the Playwright context for browser sources),
      embed them, take the highest cosine similarity against any reference photo;
    - add the weight of each keyword group with at least one word found in title + description.
 6. **Notify** every listing with `total ≥ threshold`: photo, platform, price, score, matched
-   keywords, link.
+   keywords, link. On the first run all matches go out as a digest instead (D21). A notification that fails (e.g. ntfy.sh rate limit during a large first-run
+   backfill) leaves the listing unrecorded, so the next run retries it.
 7. **Record.** Write every processed listing to `seen` (with score and notified flag) and the
    run status to `runs`. Prune `seen` rows older than 180 days.
 
@@ -181,6 +184,50 @@ ntfy:
 ```
 
 Default weights: `brand` 0.3, `model` 0.4, `color` 0.1, any other group 0.1.
+
+### 2dehands / Marktplaats (`sources/lrp.py`)
+
+Both sites run the same JSON API (`/lrp/api/search`) with the same category IDs. Facts measured
+on 2026-10-05:
+
+- The listing `date` is the bump date (`Vandaag`, `Gisteren`, `Eergisteren`, `2 okt 26`), not
+  the post date. Sorting `SORT_INDEX DECREASING` orders by it. Bump date >= post date, so the
+  stop rule never skips a listing posted after the theft.
+- Subcategory filter: repeated `l2CategoryIds=` (the singular `l2CategoryId` is ignored).
+- Hard pagination cap: `offset + limit <= 5000`. Bike listings within 50 km bumped per day:
+  about 1000 around Gent, about 3000 around Utrecht. Near backfill therefore reaches roughly
+  10 days on 2dehands and 1.5 days on Marktplaats.
+- Search results cut the description at about 200 characters. Keywords or a frame number after
+  that point are missed; accepted for v1 (a detail fetch per listing would cost hundreds of
+  requests a day).
+- Zero listings on the first near page is treated as `Blocked`: a bike category within a radius
+  is never empty, so it signals breakage, not a quiet day.
+
+### Photo score bake-off (2026-10-05)
+
+Reference: the catalogue photo of a Rock Machine Manhattan 40-27 (green hardtail MTB, white
+background). Test set: 75 listings showing a green hardtail MTB (labelled by eye from searches
+such as "groene mountainbike") against 997 near listings around Gent. 2dehands/Marktplaats
+search results carry one photo per listing.
+
+| Pipeline | AUC | Recall in top 1% | Recall in top 5% | CPU per photo |
+|---|---|---|---|---|
+| Whole photo, DINOv2-small CLS (first version) | 0.69 | 9% | 20% | 154 ms |
+| Bike crop (torchvision Faster R-CNN MobileNet), DINOv2 CLS | 0.69 | 9% | 21% | + 453 ms |
+| Whole photo, **SigLIP2-base** (chosen) | 0.94 | 20% | 71% | 336 ms |
+| Bike crop, SigLIP2-base | 0.95 | 25% | 69% | 336 + 453 ms |
+| Hue histogram of the crop | 0.75 | 0% | 7% | 9 ms |
+| Crop, SigLIP2 + 0.1 x hue histogram | 0.96 | 25% | 71% | |
+
+- The embedding model was the problem, not the background. DINOv2 ranked clean side views of
+  any bike highest (mostly road bikes); SigLIP2's top 18 negatives were all hardtail MTBs, three
+  of them lime green ones that were not labelled, so its recall is an underestimate.
+- Recall is for "a bike like mine" (same type and colour). No photo of the actual bike exists, so
+  recall on the real bike is unmeasured; a photo of the actual bike should score higher.
+- Caveat: positives came from text searches (mostly Marktplaats), negatives from 2dehands.
+- Cost: a first run of ~5000 listings went from 11 to 21 minutes (measured); one-time model
+  download of 1.5 GB (Apache-2.0).
+- Not tried: YOLO or SAM masks (cropping barely helped), DINOv3 (gated licence), fine-tuning.
 
 ## 6. Risks
 
