@@ -1,13 +1,13 @@
-# --- BikeHound: lokale gegevens, NOOIT committen ---
-# Browserprofielen bevatten sessiecookies van je accounts
+# --- BikeHound: local data, NEVER commit ---
+# data/ holds the database, cached embeddings and browser profiles (session cookies)
 data/
 !data/.gitkeep
-# Je echte configuratie (ntfy-topic, eigen fietsbeschrijving)
+# Your real configuration (ntfy topic, your bike's description)
 config.yaml
-# Eigen foto's van je fiets
+# Your own photos of your bike
 reference/*
 !reference/.gitkeep
-# Logs en databases
+# Logs and databases
 *.log
 *.sqlite
 *.sqlite3
