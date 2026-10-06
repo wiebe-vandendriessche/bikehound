@@ -26,7 +26,14 @@ def far_words(cfg) -> list[str]:
     return group.words if group else []
 
 
-from . import lrp, vinted  # after Listing, Blocked and far_words, which the sources import
+from . import (
+    facebook,
+    lrp,
+    vinted,
+)  # after Listing, Blocked and far_words, which the sources import
 
 # platform name -> search(cfg, since, max_pages=None) -> list[Listing]
-SOURCES: dict = {p: partial(lrp.search, p) for p in lrp.HOSTS} | {"vinted": vinted.search}
+SOURCES: dict = {p: partial(lrp.search, p) for p in lrp.HOSTS} | {
+    "vinted": vinted.search,
+    "facebook": facebook.search,
+}

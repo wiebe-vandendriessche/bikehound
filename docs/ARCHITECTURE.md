@@ -2,7 +2,7 @@
 
 Status: design, agreed 2026-10-05. Implemented: config, store, notify (incl. first-run digest),
 text and photo scoring, CLI (`init`, `check`, `run`), the 2dehands/Marktplaats source, the
-browser helper and the Vinted source.
+browser helper, the Vinted source and the Facebook source (logged out, best effort, D24).
 
 ## 1. Purpose and scope
 
@@ -56,7 +56,7 @@ own platform risk.
 | D11 | Paging stops once a page ends before `since`: the theft date on the first run, else the last successful run minus one day. Only unseen listing IDs are scored. Backfill is bounded by the page cap. | No duplicate work, no duplicate notifications. Platforms sort by *bump* date, so already-seen listings fill every page and "stop at a page with nothing new" never triggers. |
 | D12 | Listings without a usable location are kept, not dropped. | Missing a bike is worse than a false positive. |
 | D13 | Notifications through ntfy (one HTTP POST, photo attached, link as click action). A random topic is generated at `init`. | Free, open source, self-hostable, no account, no extra dependency. |
-| D14 | Config is a commented YAML file plus a folder of reference photos. Commands: `init`, `check`, `login`, `run`. | Technical users prefer a documented file over a wizard; `check` gives immediate feedback. |
+| D14 | Config is a commented YAML file plus a folder of reference photos. Commands: `init`, `check`, `run` (no `login`: no source needs an account, D23, D24). | Technical users prefer a documented file over a wizard; `check` gives immediate feedback. |
 | D15 | Polite behaviour fixed in code: one sequential pass, page cap per search, random pauses, normal user agent; `run` refuses to start within 12 h of the last successful run. | Protects the user's accounts and IP against a misconfigured cron. |
 | D16 | One SQLite file with only `seen` and `runs`; rows older than 180 days are pruned. | Minimal data, no seller information, stdlib `sqlite3`. |
 | D17 | `active_until` (default: theft date + 1 year) ends the search with one final notification. | Protects against forgotten cron jobs; the human decides when the bike is found. |
@@ -66,12 +66,13 @@ own platform risk.
 | D21 | The first run sends one digest (all matches sorted by score, split into messages under 4000 bytes) instead of one push per match. | A backfill of a popular model produced 121 matches; ntfy.sh rate-limits after about 60 messages. |
 | D22 | `since` and "first run" are tracked per platform (`platform_ok` table). A platform is marked ok only when it was searched without `Blocked`, and on its first run only once its digest is fully sent. | A platform blocked for days, or enabled later, catches up from its own last success instead of searching one day back. |
 | D23 | Browser sources run on BikeHound's own logged-out profile; BikeHound never logs in to a user's personal account and never creates accounts. | Protects the user's own accounts; account creation is against platform terms (section 1). |
+| D24 | Facebook logged out, best effort: one bikes page per price band (6) plus one text search per far word, in a fixed big-city area per country (`brussels`, `amsterdam`). No account, no login, no backfill, no radius. | A login needs an account and identity checks; logged out, one page is a stale 24-listing sample, but the price-band union covers several days. Partial coverage beats none (section 1). |
 
 ## 3. Components
 
 ```
                      ┌──────────────────────────┐
-  cron / systemd ───▶│ cli.py                   │  init · check · login · run
+  cron / systemd ───▶│ cli.py                   │  init · check · run
   docker run         └────────────┬─────────────┘
                                   │
           ┌───────────────────────┼─────────────────────────────┐
@@ -111,7 +112,6 @@ own platform risk.
 |---|---|
 | `bikehound init` | Copies `config.example.yaml` to `config.yaml` with a random ntfy topic. |
 | `bikehound check` | Validates the config, embeds the reference photos, sends a test notification and runs one small search per enabled platform. |
-| `bikehound login facebook` | Opens a visible browser on the Facebook profile so the user can log in once. |
 | `bikehound run` | The daily job. |
 
 ### Files on disk (all git-ignored)
@@ -243,6 +243,38 @@ Facts measured on vinted.be on 2026-10-06, logged out, headless Chromium, home I
   so each listing below the cutoff is dropped, but paging stops only at a page with nothing above
   it (as D11). Zero cards on the first near page raises `Blocked`.
 
+### Facebook Marketplace (`sources/facebook.py`), logged out
+
+Spikes on 2026-10-06, fresh profile, logged out, headless, home IP. A logged-in source was
+dropped: every maintained open-source tool that pages through Marketplace logs in, and a new
+account had to pass a webcam identity check. Decision D24: logged out, best effort.
+
+- The bikes category (`/marketplace/<city>/bicycles?sortBy=creation_time_descend`) loads without
+  login (HTTP 200). A cookie dialog appears; the data is in the server HTML regardless.
+- The HTML embeds 24 listings as Relay JSON (`GroupCommerceProductItem`): id, title, price,
+  `creation_time`, city (`reverse_geocode`), photo URL. No description, no coordinates.
+- Scrolling loads nothing more logged out (no GraphQL requests), so one URL gives 24 listings.
+- **The logged-out feed is a cached sample, not the newest listings.** The same search split
+  into three price bands returned 25 listings newer than the main feed's oldest that the main
+  feed did not show, and listings up to 4 hours newer than its newest. Reloading returned the
+  identical 24.
+- Location only by city slug in the path. `radius` is ignored (10 km and the default 65 km
+  returned the same listings); `latitude`/`longitude` query parameters are ignored too.
+- What works: text search (`/marketplace/<city>/search?query=...`) returns 24 results; the
+  photo CDN serves plain `httpx`; 9 loads in a row hit no login wall.
+- **Price bands fill the gap.** One page per band (`minPrice`/`maxPrice`: 0-50, 50-100,
+  100-200, 200-400, 400-800, 800+) gives 24 listings each; around Brussels every band reached 2
+  to 7 days back, and the union held 131 distinct listings against 24 on the plain page. A daily
+  run (yesterday onward) found 50 listings in 7 page loads (35 s).
+- **The area is Facebook's, not the user's.** Only big-city slugs exist (`brussels`,
+  `amsterdam`); others (`leuven`, `ghent`, `antwerp`, `bruges`) silently return San Francisco
+  listings, and the numeric city ids that listings carry return the Brussels results. So the
+  source uses one verified slug per country and has no location setting. Listings came from
+  across Flanders and Brussels (Kortrijk to Antwerpen to Namur), wider than `radius_km`.
+- Far text searches need no bands: a search for a brand reached 10 days back on one page.
+- 14 loads in a row hit no login wall. Reports say Facebook has been sending anonymous visitors
+  to a login page since mid-2026; then every band comes back empty, which raises `Blocked`.
+
 ### Photo score bake-off (2026-10-05)
 
 Reference: the catalogue photo of a Rock Machine Manhattan 40-27 (green hardtail MTB, white
@@ -276,7 +308,7 @@ search results carry one photo per listing.
 | Platform changes its API or page structure | That source returns nothing or fails | Fetch/parse split, fixtures make repair quick; failures are reported to the user, not swallowed. A source that silently returns zero results is the dangerous case (see open questions). |
 | Bot protection (Vinted, Leboncoin: Datadome) | Source blocked, sometimes for days | Real browser, persistent profile, home IP, low volume. When blocked: skip and notify. Accept lower coverage. |
 | Headless browsers are easier to detect | More blocks on servers without a display | Document running headed (e.g. under `xvfb-run`) as an option; no stealth tricks. |
-| Facebook account blocked | User loses their personal account | Opt-in, clear warning, one run a day, low page cap. The user decides which account to use. |
+| Facebook closes anonymous access | Facebook source stops | No account is used (D24). All bands empty raises `Blocked`: the user gets a failure notification, the other sources continue. |
 | Terms of service | Automated access is forbidden on several platforms | Personal use only, stated in the README; no circumvention; responsibility lies with the user. |
 | Costs | — | No paid APIs. Compute is local CPU; volume is a few hundred listings a day. |
 | Docker image size (`torch` + Chromium + model) | Multi-GB image, slow first pull | Accept for v1; ONNX Runtime instead of `torch` is the upgrade path. |

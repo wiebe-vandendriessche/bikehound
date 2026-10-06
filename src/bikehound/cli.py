@@ -167,7 +167,6 @@ def main() -> None:
         choices=sorted(PLATFORMS),
         help="search only this platform instead of the config's list (repeatable)",
     )
-    # `login` joins when the Playwright sources exist
     args = p.parse_args()
     try:
         sys.exit(args.fn(args))
