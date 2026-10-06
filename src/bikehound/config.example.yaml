@@ -10,7 +10,7 @@ location:
   country: BE
   radius_km: 50
 
-# Opt-in: vinted, facebook (read the README warnings first)
+# Opt-in: vinted, facebook. Their terms forbid automated access; read the README first.
 platforms: [2dehands, marktplaats]
 
 # Any group name. Words in every language the platforms use.

@@ -14,7 +14,8 @@
 
 Had your bike stolen? It often shows up for sale online within days or weeks, usually with a
 vague title like *"bike for sale"*, no brand and a single photo. Checking every marketplace by
-hand, every day, is exhausting. BikeHound does it for you.
+hand, every day, is exhausting. BikeHound does it for you, on the second-hand marketplaces
+used in Belgium and the Netherlands.
 
 Describe your bike once, add a few photos, and BikeHound keeps watch. When a listing looks like
 your bike, you get a notification on your phone with a photo and a link.
@@ -34,6 +35,9 @@ your bike, you get a notification on your phone with a photo and a link.
 - Marktplaats.nl
 - Vinted (opt-in)
 - Facebook Marketplace (opt-in, best effort, no account)
+
+Vinted and Facebook are off by default: their terms forbid automated access and they actively
+block it. Add them to `platforms` only if you accept that risk.
 
 ## Usage
 

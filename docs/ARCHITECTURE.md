@@ -7,7 +7,7 @@ Dockerfile.
 
 ## 1. Purpose and scope
 
-BikeHound searches second-hand marketplaces once a day for one stolen bike and sends the owner a
+BikeHound searches Belgian and Dutch second-hand marketplaces once a day for one stolen bike and sends the owner a
 push notification for every listing that might be it. The owner looks at the photo and decides.
 
 Guiding rule: **a false positive costs the owner five seconds; a missed bike costs the bike.**
@@ -20,8 +20,8 @@ own platform risk.
 ### In scope
 
 - A command-line tool, run once a day by the host's scheduler (cron, systemd timer, Docker).
-- Four marketplaces: 2dehands.be, Marktplaats.nl, Vinted, Facebook Marketplace (Leboncoin was
-  planned and dropped, D25).
+- Four marketplaces used in Belgium and the Netherlands: 2dehands.be, Marktplaats.nl, Vinted,
+  Facebook Marketplace. `country` is `BE` or `NL`.
 - Matching on photos (local image model) plus a text bonus for configured keywords.
 - Push notifications through ntfy.
 - One bike per config file.
@@ -32,6 +32,7 @@ own platform risk.
 |---|---|
 | Hosted service, web UI, user accounts | Would make the maintainer run scrapers on behalf of others and hold their personal data. |
 | Built-in scheduler or long-running daemon | Runs once a day; cron/systemd/Docker already schedule. |
+| Marketplaces outside Belgium and the Netherlands | Keeps the sources few enough to maintain and to verify by hand. |
 | Plugin system for marketplaces | Four sources in one repo; new ones arrive as a pull request. |
 | Bot-protection bypass (stealth plugins, paid proxies, CAPTCHA solvers) | Costs money, is an arms race, and actively circumvents platform security. |
 | Creating or recommending throwaway accounts | Also against platform terms. |
@@ -47,7 +48,7 @@ own platform risk.
 |---|---|---|
 | D1 | Audience: technical users who self-host. | Generic without needing a hosted service. |
 | D2 | One-shot CLI (`bikehound run`), scheduled by the host; a Dockerfile as an alternative install (built locally, not published). | No daemon to keep alive; a home IP has the best chance against bot protection. |
-| D3 | Four marketplaces in v1 (Leboncoin dropped, D25). 2dehands and Marktplaats on by default; Vinted and Facebook opt-in. | The user chooses their own platform and account risk. |
+| D3 | Four marketplaces in v1. 2dehands and Marktplaats on by default; Vinted and Facebook opt-in. | Vinted's and Facebook's terms forbid automated access and both actively block it; the user chooses to take that risk. |
 | D4 | 2dehands/Marktplaats through their shared JSON API over plain HTTP. Vinted and Facebook through Playwright with a real Chromium and a persistent profile per platform. Where the page fetches JSON, the source reads that response instead of scraping selectors. | One browser mechanism for the hard platforms; intercepted JSON breaks less often than CSS selectors. |
 | D5 | On a block, CAPTCHA or expired session: skip that platform for this run, notify the user, no retry. | Fail soft and visibly; never escalate. |
 | D6 | One Python module per platform exposing `search()`, registered in a plain dict. | Adding a platform is one file plus one line. No base class, no entry points. |
@@ -69,11 +70,10 @@ own platform risk.
 | D22 | `since` and "first run" are tracked per platform (`platform_ok` table). A platform is marked ok only when it was searched without `Blocked`, and on its first run only once its digest is fully sent. | A platform blocked for days, or enabled later, catches up from its own last success instead of searching one day back. |
 | D23 | Browser sources run on BikeHound's own logged-out profile; BikeHound never logs in to a user's personal account and never creates accounts. | Protects the user's own accounts; account creation is against platform terms (section 1). |
 | D24 | Facebook logged out, best effort: one bikes page per price band (6) plus one text search per far word, in a fixed big-city area per country (`brussels`, `amsterdam`). No account, no login, no backfill, no radius. | A login needs an account and identity checks; logged out, one page is a stale 24-listing sample, but the price-band union covers several days. Partial coverage beats none (section 1). |
-| D25 | No Leboncoin source. | Spike on 2026-10-06: a fresh logged-out profile, headless and headed, gets a Datadome CAPTCHA (HTTP 403) on the search and category pages; after a few loads the homepage is blocked too. Getting through needs CAPTCHA solving or stealth (section 1). |
-| D26 | Location is `postcode`, `country` and `radius_km`; no coordinates in the config and no client-side radius filter. | Only 2dehands and Marktplaats take a radius, and they apply it server-side; Vinted and Facebook carry no coordinates. `lat`/`lon` were only needed for Leboncoin's search across the border (D25). Old configs with `lat`/`lon` still load. |
-| D27 | Silent breakage raises `Blocked`: zero listings on the first near page (2dehands, Marktplaats, Vinted), or all price bands empty (Facebook). | A bike category within a radius, or a whole country's newest bikes, is never empty; zero means a changed page or a block, not a quiet day. |
-| D28 | Page caps: 2dehands/Marktplaats near 50 pages of 100 (the API's 5000-result cap), far 10; Vinted near 10 pages of 96 (the site's cap), far 2; Facebook one page per band or word. The first run backfills only as far as the caps reach. | Polite volume; the measured reach is in the per-platform facts below. |
-| D29 | The far search keeps its fallback to brand words when no `model` group is set; `check` warns about it. | Measured 2026-10-06, brand-only far search, listings bumped today or yesterday: Marktplaats hit the 1000-listing cap for Gazelle and Batavus and found 743 for Cortina; 2dehands 21 to 206. That is minutes of CPU, but brand (0.3) plus a photo score of 0.2 notifies about 5% of them. A far search with lookalikes still beats none. |
+| D25 | Location is `postcode`, `country` and `radius_km`; no coordinates in the config and no client-side radius filter. | Only 2dehands and Marktplaats take a radius, and they apply it server-side; Vinted and Facebook carry no coordinates. Old configs with `lat`/`lon` still load (the keys are ignored). |
+| D26 | Silent breakage raises `Blocked`: zero listings on the first near page (2dehands, Marktplaats, Vinted), or all price bands empty (Facebook). | A bike category within a radius, or a whole country's newest bikes, is never empty; zero means a changed page or a block, not a quiet day. |
+| D27 | Page caps: 2dehands/Marktplaats near 50 pages of 100 (the API's 5000-result cap), far 10; Vinted near 10 pages of 96 (the site's cap), far 2; Facebook one page per band or word. The first run backfills only as far as the caps reach. | Polite volume; the measured reach is in the per-platform facts below. |
+| D28 | The far search keeps its fallback to brand words when no `model` group is set; `check` warns about it. | Measured 2026-10-06, brand-only far search, listings bumped today or yesterday: Marktplaats hit the 1000-listing cap for Gazelle and Batavus and found 743 for Cortina; 2dehands 21 to 206. That is minutes of CPU, but brand (0.3) plus a photo score of 0.2 notifies about 5% of them. A far search with lookalikes still beats none. |
 
 ## 3. Components
 
@@ -277,19 +277,6 @@ account had to pass a webcam identity check. Decision D24: logged out, best effo
 - Far text searches need no bands: a search for a brand reached 10 days back on one page.
 - 14 loads in a row hit no login wall. Reports say Facebook has been sending anonymous visitors
   to a login page since mid-2026; then every band comes back empty, which raises `Blocked`.
-
-### Leboncoin (dropped, D25)
-
-Spike on 2026-10-06, home IP, fresh profiles, logged out. The goal was a search across the
-border: the French part of the user's radius (for example Kortrijk + 50 km reaches Lille).
-
-- Headless: `/recherche?category=55&sort=time&order=desc` answered HTTP 403, Datadome
-  (`x-datadome: protected`, a `captcha-delivery` page).
-- Headed, new profile: the homepage loaded (HTTP 200), the search page right after it 403 with
-  the CAPTCHA. `/c/velos` the same.
-- After about 8 page loads in total, even the homepage answered 403 on a new profile: the IP
-  was flagged.
-- Not tried, as out of scope: CAPTCHA solving, stealth plugins, proxies, an account.
 
 ### Photo score bake-off (2026-10-05)
 

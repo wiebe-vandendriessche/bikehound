@@ -46,9 +46,6 @@ def check(args) -> int:
     print("Test notification sent.")
     ok = True
     for platform in cfg.platforms:
-        if platform not in SOURCES:
-            print(f"{platform}: source not implemented yet")
-            continue
         try:
             found = SOURCES[platform](cfg, today(), max_pages=1)
         except Blocked as e:
@@ -96,10 +93,8 @@ def run(args) -> int:
     refs = reference_embeddings(model, cfg)
     status, digest, backfilled = {}, [], []
     for platform in args.platform or cfg.platforms:
-        search = SOURCES.get(platform)
+        search = SOURCES[platform]
         try:
-            if search is None:
-                raise Blocked("source not implemented yet")
             # per platform, so a platform that was blocked or newly enabled catches up;
             # day-precision dates, so overlap a day; seen filters the repeats
             last = store.last_ok(platform)

@@ -1,12 +1,12 @@
 name: New marketplace
-description: Suggest a marketplace BikeHound should search.
+description: Suggest a Belgian or Dutch marketplace BikeHound should search.
 labels: [marketplace]
 body:
   - type: input
     id: site
     attributes:
       label: Marketplace and country
-      placeholder: e.g. example-marketplace.de, Germany
+      placeholder: e.g. example-marketplace.be, Belgium
     validations:
       required: true
   - type: textarea

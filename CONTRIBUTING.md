@@ -1,7 +1,7 @@
 # Contributing to BikeHound
 
 Thanks for helping people get their bikes back. The most useful contributions are fixes when a
-marketplace changes its pages, and new marketplaces.
+marketplace changes its pages, and new marketplaces used in Belgium or the Netherlands.
 
 Before a larger change, open an issue so we can agree on the approach. The design and the
 reasons behind it are in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md); open decisions are in

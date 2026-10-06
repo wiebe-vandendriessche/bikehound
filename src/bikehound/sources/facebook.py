@@ -62,9 +62,7 @@ def search(cfg, since: date, max_pages: int | None = None, fetch=None) -> list[L
     if fetch is None:
         with pages(cfg, "facebook") as get:
             return search(cfg, since, max_pages, get)
-    city = CITY.get(cfg.country.upper())
-    if city is None:
-        raise Blocked(f"no Facebook area known for country {cfg.country}")
+    city = CITY[cfg.country]  # config allows BE and NL only
     found: dict[str, Listing] = {}
     # near: one bikes page per price band (max_pages limits the bands, for `check`)
     for lo, hi in BANDS[:max_pages]:
