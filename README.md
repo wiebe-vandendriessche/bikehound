@@ -64,6 +64,18 @@ Keyword groups add to the photo score when any of their words appears in the lis
 `brand` 0.3, `model` 0.4, any other group 0.1 unless you set `weight`. Brand plus model is
 enough to notify on its own; raise the weight of a rare, distinctive colour.
 
+Words match anywhere in the title and description, so pick words that only your bike's
+listings would contain:
+
+- **Avoid short, generic words.** A short word also matches inside longer words and other
+  brands' names. Prefer the full name as a phrase, and add the spellings sellers use (with and
+  without spaces or dashes).
+- **Put the model name in `model`,** not in `brand`.
+- **Numbers match whole numbers only:** `28` does not match `280` or `28.5`, but it still
+  matches every "28 inch" wheel. Use the full model number instead of a bare number.
+- **Check before you run:** `bikehound check` prints how many listings on the first page would
+  notify, how many by keywords alone, and which keyword groups fired.
+
 ### 3. Add photos of your bike
 
 Put one or more photos in the `reference/` folder (jpg, png or webp). Best: a side view showing

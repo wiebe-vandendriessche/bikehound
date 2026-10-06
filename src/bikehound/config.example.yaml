@@ -17,6 +17,7 @@ platforms: [2dehands, marktplaats]
 
 # Any group name. Words in every language the platforms use.
 # Default weights: brand 0.3, model 0.4, anything else 0.1.
+# Words match anywhere in the text: prefer full names as phrases over short, generic words.
 keywords:
   brand: { words: [cortina] }
   model: { words: [e-u4, eu4, "e u4"] }

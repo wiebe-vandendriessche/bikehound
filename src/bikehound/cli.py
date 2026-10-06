@@ -61,6 +61,12 @@ def check(args) -> int:
               f"median {ps[len(ps) // 2]:.2f}, p95 {ps[len(ps) // 20]:.2f}, max {ps[0]:.2f}")  # fmt: skip
         for p, l in scored[:3]:
             print(f"  {p:.2f}  {l.title[:60]}  {l.url}")
+        hits = sorted(((s, l) for p, l in scored if (s := score(l, cfg, p)).notify(cfg.threshold)),
+                      key=lambda h: h[0].total, reverse=True)  # fmt: skip
+        by_text = sum(s.total - s.photo >= cfg.threshold for s, _ in hits)
+        print(f"  would notify: {len(hits)} of {len(found)} ({by_text} by keywords alone)")
+        for s, l in hits[:3]:
+            print(f"  {s.total:.2f}  {s.reasons()}  {l.title[:40]}  {l.url}")
     return 0 if ok else 1
 
 

@@ -50,7 +50,7 @@ own platform risk.
 | D5 | On a block, CAPTCHA or expired session: skip that platform for this run, notify the user, no retry. | Fail soft and visibly; never escalate. |
 | D6 | One Python module per platform exposing `search()`, registered in a plain dict. | Adding a platform is one file plus one line. No base class, no entry points. |
 | D7 | Photo score from a local image model (SigLIP2-base via `transformers`, CPU-only torch) on the whole photo, cosine similarity, highest pair across the first 3 listing photos x all reference photos. Rescaled so the measured median of unrelated listings (0.55) maps to 0 and their 99th percentile (0.71) to 0.5. Default `threshold` 0.5. | Free, private, works offline; one good photo is enough. Chosen over DINOv2 by a measured bake-off (below). Rescaling keeps the keyword weights meaningful: `brand + model` (0.7) reaches the threshold, `color` alone does not, the photo alone only for about the closest 1% of listings. |
-| D8 | Text bonus: user-defined keyword groups (brand, model, colour, …) with optional per-group weight, matched as case- and accent-insensitive substrings in title and description. `total = photo_score + Σ matched group weights`. | Strong text evidence (brand + model, or a bright distinctive colour) must lift a listing over the threshold even when the photo doesn't match. |
+| D8 | Text bonus: user-defined keyword groups (brand, model, colour, …) with optional per-group weight, matched as case- and accent-insensitive substrings in title and description, except that a number never matches inside a longer number (`28` is not in `280`, `28.00` or `28.5`). `total = photo_score + Σ matched group weights`. | Strong text evidence (brand + model, or a bright distinctive colour) must lift a listing over the threshold even when the photo doesn't match. |
 | D9 | Frame number found in the text: always notify. | Unambiguous evidence. |
 | D10 | Two searches per platform: *near & broad* (bike subcategories only, within a radius, newest first) and *far & targeted* (model keywords, whole category, nationwide). Near runs only on platforms that accept the user's postcode (2dehands for BE, Marktplaats for NL). | Vague listings are caught near home by photo; honest listings far away are caught by text. A foreign postcode is silently ignored, which would turn near into a nationwide flood. |
 | D11 | Paging stops once a page ends before `since`: the theft date on the first run, else the last successful run minus one day. Only unseen listing IDs are scored. Backfill is bounded by the page cap. | No duplicate work, no duplicate notifications. Platforms sort by *bump* date, so already-seen listings fill every page and "stop at a page with nothing new" never triggers. |
@@ -219,7 +219,12 @@ Facts measured on vinted.be on 2026-10-06, logged out, headless Chromium, home I
   preference: there is no JSON to read).
 - Cards carry stable `data-testid="product-item-id-<id>--..."` attributes: link (`--overlay-link`,
   whose `title` also holds brand, condition and price), photo (`--image--img`, 310x430 webp),
-  price (`--price-text`). No date, no location, no description, no seller data.
+  price (`--price-text`). No date, no location, no description, no seller data. The trailing
+  prices are stripped from the title, so number keywords never hit on a price.
+- Location: the item page shows one (`data-testid="seller-location"`) only for business sellers
+  (those with a legal registration); none of 12 sampled private listings had one. So Vinted
+  listings carry no location, and fetching item pages to find one is not worth the requests.
+  vinted.be also shows listings from other countries (seen: the Netherlands).
 - Photos: the CDN (`images1.vinted.net`) serves plain `httpx`, so the shared photo download works.
 - 96 items per page, hard cap of 10 pages (page 11 is empty).
 - Categories: 4345 bikes and 4346 e-bikes, each including its subcategories (checked: the same

@@ -4,6 +4,7 @@ The JSON API (/api/v2/catalog/items) refuses direct calls with 403, so this pars
 server-rendered catalog HTML instead. Facts measured on vinted.be: see ARCHITECTURE.md.
 """
 
+import re
 from datetime import date
 from html.parser import HTMLParser
 from urllib.parse import urlencode
@@ -25,6 +26,9 @@ FAR_PAGES = 2
 # `since` and the oldest listings are missed: re-measure from two items' upload times
 IDS_PER_DAY = 8_000_000
 TESTID = "product-item-id-"
+# the card title ends in ", 450.00 <euro sign>, 470.25 <euro sign>" (price, price with fees):
+# not keyword material
+PRICES = re.compile(r"(?:,\s*[\d.,]+\s*[^\w\s,]+)+$")
 
 
 class _Cards(HTMLParser):
@@ -67,7 +71,7 @@ def parse(html: str, host: str) -> list[Listing]:
             id=iid,
             platform="vinted",
             url=f"https://{host}{c['href'].split('?')[0]}",
-            title=c["title"],
+            title=PRICES.sub("", c["title"]),
             price=c.get("price", ""),
             photo_urls=[c["photo"]] if "photo" in c else [],
         )

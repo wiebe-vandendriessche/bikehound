@@ -18,7 +18,8 @@ def test_parse_maps_fields():
     a, b, c = parse(HTML, "www.vinted.be")  # the favourite-only id has no link, so no listing
     assert (a.id, a.platform) == ("1000000001", "vinted")
     assert a.url == "https://www.vinted.be/items/1000000001-cortina-e-u4-groen"
-    assert a.title.startswith("Cortina E-U4 groen, Marque: Cortina")
+    assert a.title == "Cortina E-U4 groen, Marque: Cortina, État: Bon état"  # no prices
+    assert c.title == "Mountainbike"
     assert (a.price, a.photo_urls) == ("450,00 €", ["https://images.example.test/v1.webp?s=1"])
     assert (b.price, b.photo_urls) == ("80,00 €", [])
     assert c.price == ""  # empty price text never picks up a later number
