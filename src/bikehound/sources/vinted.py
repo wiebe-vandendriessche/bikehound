@@ -4,6 +4,7 @@ The JSON API (/api/v2/catalog/items) refuses direct calls with 403, so this pars
 server-rendered catalog HTML instead. Facts measured on vinted.be: see ARCHITECTURE.md.
 """
 
+import logging
 import re
 from datetime import date
 from html.parser import HTMLParser
@@ -29,6 +30,8 @@ TESTID = "product-item-id-"
 # the card title ends in ", 450.00 <euro sign>, 470.25 <euro sign>" (price, price with fees):
 # not keyword material
 PRICES = re.compile(r"(?:,\s*[\d.,]+\s*[^\w\s,]+)+$")
+
+log = logging.getLogger(__name__)
 
 
 class _Cards(HTMLParser):
@@ -94,13 +97,16 @@ def search(cfg, since: date, max_pages: int | None = None, fetch=None) -> list[L
     for kind, params, cap in runs:
         for page in range(1, min(cap, max_pages or cap) + 1):
             q = urlencode(params + [("order", "newest_first"), ("page", page)])
-            batch = parse(fetch(f"https://{host}/catalog?{q}"), host)
+            url = f"https://{host}/catalog?{q}"
+            batch = parse(fetch(url), host)
+            log.debug("vinted: %d listings, %s", len(batch), url)
             if kind == "near" and page == 1:
                 if not batch:
                     # newest bikes in a whole country are never empty: breakage, not a quiet day
                     raise Blocked("near search returned nothing")
                 days = (today() - since).days + 1
                 cutoff = max(int(l.id) for l in batch) - days * IDS_PER_DAY
+                log.debug("vinted: id cutoff %d (%d days back)", cutoff, days)
             # "newest first" is by bump, and a bumped listing keeps its old id: drop each old
             # one, but only a page with nothing after the cutoff ends the search (as D11)
             new = [l for l in batch if int(l.id) >= cutoff]

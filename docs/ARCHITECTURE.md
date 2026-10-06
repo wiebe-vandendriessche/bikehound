@@ -74,6 +74,7 @@ own platform risk.
 | D26 | Silent breakage raises `Blocked`: zero listings on the first near page (2dehands, Marktplaats, Vinted), or all price bands empty (Facebook). | A bike category within a radius, or a whole country's newest bikes, is never empty; zero means a changed page or a block, not a quiet day. |
 | D27 | Page caps: 2dehands/Marktplaats near 50 pages of 100 (the API's 5000-result cap), far 10; Vinted near 10 pages of 96 (the site's cap), far 2; Facebook one page per band or word. The first run backfills only as far as the caps reach. | Polite volume; the measured reach is in the per-platform facts below. |
 | D28 | The far search keeps its fallback to brand words when no `model` group is set; `check` warns about it. | Measured 2026-10-06, brand-only far search, listings bumped today or yesterday: Marktplaats hit the 1000-listing cap for Gazelle and Batavus and found 743 for Cortina; 2dehands 21 to 206. That is minutes of CPU, but brand (0.3) plus a photo score of 0.2 notifies about 5% of them. A far search with lookalikes still beats none. |
+| D29 | Any exception in a source, not only `Blocked`, fails that platform for the run: logged with its traceback, "failed" notification, not marked ok. A bad photo scores 0. Anything else that escapes `run` sends one "run crashed" notification. `run` exits 1 when a platform failed or a notification was deferred. Logging is stdlib `logging` to stderr: `-q` warnings, default info, `-v` debug, `-vv` debug for every library. | A changed page is the usual breakage, and an unattended run that dies silently looks like quiet days. A bad listing must not block its platform on every run. |
 
 ## 3. Components
 
@@ -104,12 +105,12 @@ own platform risk.
 
 | Component | Responsibility |
 |---|---|
-| `cli.py` | Parses commands with `argparse` and runs the flow in section 4. `-c` selects the config file. |
+| `cli.py` | Parses commands with `argparse` and runs the flow in section 4. `-c` selects the config file, `-q`/`-v`/`-vv` the log level (D29). |
 | `config.py` | Loads `config.yaml` into a dataclass, applies defaults and fails with a clear message on missing or invalid fields. |
 | `sources/<platform>.py` | `search(query) -> list[Listing]`. Split into fetching (HTTP or Playwright) and a pure `parse(raw) -> list[Listing]`. Raises a single `Blocked` exception on CAPTCHA, block or expired session. |
 | `sources/__init__.py` | `SOURCES = {"2dehands": ..., "marktplaats": ..., ...}` and the `Listing` dataclass (id, platform, url, title, description, price, location, photo URLs, posted_at). |
 | `match.py` | Loads the model, computes and caches reference embeddings (keyed by file hash), scores each listing: photo score, keyword bonus, frame-number hit. Returns the score and the reasons for it. |
-| `notify.py` | Sends three message kinds to ntfy: possible match, platform failure, search stopped. |
+| `notify.py` | Sends four message kinds to ntfy: possible match, platform failure, run crashed, search stopped. |
 | `store.py` | SQLite access: `seen` (platform, listing_id, first_seen, score, notified), `runs` (started_at, per-platform status). Pruning and the 12-hour guard. |
 
 ### Commands
@@ -145,8 +146,8 @@ With several bikes, each config file gets its own `data/` folder next to it.
      distance limit;
    - pages continue until a page ends before `since` (D11), a page comes back short, or the
      page cap is reached;
-   - on `Blocked`, record the failure, send a failure notification and continue with the next
-     platform.
+   - on `Blocked` or any other exception (D29), record the failure, send a failure
+     notification and continue with the next platform.
 4. **Filter.** Drop listings already in `seen`. The radius is applied by the platforms that
    support one; listings without a location are kept.
 5. **Score.** For each listing:

@@ -8,6 +8,7 @@ Chromium. No account. Best effort, measured 2026-10-06 (see ARCHITECTURE.md):
 """
 
 import json
+import logging
 import re
 from datetime import UTC, date, datetime
 from urllib.parse import quote
@@ -23,6 +24,8 @@ SORT = "sortBy=creation_time_descend&exact=false"
 BANDS = ((0, 50), (50, 100), (100, 200), (200, 400), (400, 800), (800, None))
 ITEM = "GroupCommerceProductItem"
 SCRIPT = re.compile(r'<script type="application/json"[^>]*>(.*?)</script>', re.DOTALL)
+
+log = logging.getLogger(__name__)
 
 
 def _listing(x: dict) -> Listing:
@@ -67,10 +70,12 @@ def search(cfg, since: date, max_pages: int | None = None, fetch=None) -> list[L
     # near: one bikes page per price band (max_pages limits the bands, for `check`)
     for lo, hi in BANDS[:max_pages]:
         band = f"&minPrice={lo}" + (f"&maxPrice={hi}" if hi else "")
-        batch = parse(fetch(f"{BASE}/{city}/bicycles?{SORT}{band}"))
-        if batch and min(l.posted_at for l in batch) > since:
-            print(f"facebook: price band {lo}-{hi or ''} reached back only to "
-                  f"{min(l.posted_at for l in batch)}; older listings in it were not seen")  # fmt: skip
+        url = f"{BASE}/{city}/bicycles?{SORT}{band}"
+        batch = parse(fetch(url))
+        log.debug("facebook: %d listings, %s", len(batch), url)
+        if batch and (oldest := min(l.posted_at for l in batch)) > since:
+            log.warning("facebook: price band %s-%s reached back only to %s; older listings in "
+                        "it were not seen", lo, hi or "", oldest)  # fmt: skip
         found |= {l.id: l for l in batch}
     if not found:
         # bikes around a capital are never empty: a login wall, a changed page, or a profile
@@ -81,5 +86,8 @@ def search(cfg, since: date, max_pages: int | None = None, fetch=None) -> list[L
         )
     # far: text searches are sparse enough for one page each (10 days deep in the spike)
     for w in far_words(cfg):
-        found |= {l.id: l for l in parse(fetch(f"{BASE}/{city}/search?query={quote(w)}&{SORT}"))}
+        url = f"{BASE}/{city}/search?query={quote(w)}&{SORT}"
+        batch = parse(fetch(url))
+        log.debug("facebook: %d listings, %s", len(batch), url)
+        found |= {l.id: l for l in batch}
     return [l for l in found.values() if l.posted_at >= since]

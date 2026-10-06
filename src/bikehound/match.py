@@ -1,5 +1,6 @@
 import hashlib
 import io
+import logging
 import re
 import unicodedata
 from dataclasses import dataclass, field
@@ -20,6 +21,8 @@ PHOTOS_PER_LISTING = 3
 # keeps the keyword weights meaningful.
 # ponytail: anchors measured on one reference photo; calibrate per user in `check` if they drift
 PHOTO_MEDIAN, PHOTO_P99 = 0.55, 0.71
+
+log = logging.getLogger(__name__)
 
 
 def norm(s: str) -> str:
@@ -106,6 +109,7 @@ def reference_embeddings(model, cfg: Config) -> torch.Tensor:
     for p in photos:
         # model name in the key, so a model change never reuses old embeddings
         f = cache / f"{MODEL.replace('/', '--')}-{hashlib.sha256(p.read_bytes()).hexdigest()}.pt"
+        log.debug("reference %s: %s", p.name, "cached" if f.exists() else "embedding")
         if not f.exists():
             torch.save(embed(model, [Image.open(p)])[0], f)
         rows.append(torch.load(f))
@@ -130,12 +134,19 @@ def download(client: httpx.Client, urls: list[str]) -> list[Image.Image]:
             img = Image.open(io.BytesIO(r.content))
             img.load()
             images.append(img)
-        except httpx.HTTPError, OSError:
-            continue
+        except (httpx.HTTPError, OSError) as e:
+            log.debug("photo skipped, %s: %s", url, e)
     return images
 
 
 def listing_photo_score(model, refs: torch.Tensor, client: httpx.Client, listing: Listing) -> float:
     # ponytail: plain HTTP download; browser sources will need their Playwright context
     images = download(client, listing.photo_urls)
-    return photo_score(embed(model, images), refs) if images else 0.0
+    if not images:
+        return 0.0
+    try:
+        return photo_score(embed(model, images), refs)
+    except Exception as e:  # noqa: BLE001, any decode or model error
+        # scored on text alone and recorded, so a bad photo is not retried on every run
+        log.warning("photo scoring failed for %s: %s", listing.url, e)
+        return 0.0

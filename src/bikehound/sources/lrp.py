@@ -1,5 +1,6 @@
 """2dehands.be and Marktplaats.nl: one shared JSON search API (/lrp/api/search)."""
 
+import logging
 import random
 import time
 from datetime import date, datetime, timedelta
@@ -21,6 +22,8 @@ NEAR_PAGES = 50  # the API returns nothing past offset + limit = 5000
 FAR_PAGES = 10
 MONTHS = ["jan", "feb", "mrt", "apr", "mei", "jun", "jul", "aug", "sep", "okt", "nov", "dec"]
 RELATIVE = {"vandaag": 0, "gisteren": 1, "eergisteren": 2}
+
+log = logging.getLogger(__name__)
 
 
 def today() -> date:
@@ -78,6 +81,7 @@ def _pages(fetch, params: list, platform: str, since: date, cap: int) -> list[Li
         if raw.get("hasErrors"):
             raise Blocked("search API reported errors")
         batch = parse(raw, platform)
+        log.debug("%s page %d: %d listings, %s", platform, page, len(batch), params)
         out += batch
         if len(batch) < LIMIT:
             break

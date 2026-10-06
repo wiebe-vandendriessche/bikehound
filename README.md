@@ -136,6 +136,11 @@ To test by hand, `run --force` skips that guard and `run --platform vinted` (rep
 searches only the platforms you name. A run limited with `--platform` does not count for the
 guard, so it never makes your scheduled run skip a day.
 
+How much goes to the log: `bikehound -q run` writes only warnings and errors, `-v` adds every
+page fetched and every listing's score, `-vv` also every HTTP request. A platform that fails,
+for whatever reason, is skipped for that run with a "failed" notification; the others still run.
+If the run itself crashes you get a "run crashed" notification. Either way the exit code is 1.
+
 ### Run with Docker instead
 
 Prefer a container? Build the image once, then keep each bike in its own folder (config,

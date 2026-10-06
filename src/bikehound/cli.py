@@ -1,4 +1,5 @@
 import argparse
+import logging
 import secrets
 import sys
 from datetime import datetime, timedelta
@@ -13,6 +14,8 @@ from .match import frame_hit, listing_photo_score, load_model, reference_embeddi
 from .sources import SOURCES, Blocked
 from .sources.lrp import UA
 from .store import Store, now
+
+log = logging.getLogger(__name__)
 
 
 def init(args) -> int:
@@ -40,16 +43,21 @@ def check(args) -> int:
     )
     if "model" not in cfg.keywords and "brand" in cfg.keywords:
         # measured: a common brand fills Marktplaats' far cap of 1000 listings in two days
-        print("Warning: no `model` keywords, so the nationwide search uses the brand words. For a "
-              "common brand that is hundreds of listings a day and many lookalike notifications.")  # fmt: skip
-    notify._send(cfg.ntfy_url, "BikeHound test notification", "BikeHound check", tags="dog")
-    print("Test notification sent.")
+        log.warning("no `model` keywords, so the nationwide search uses the brand words. For a "
+                    "common brand that is hundreds of listings a day and many lookalike "
+                    "notifications.")  # fmt: skip
     ok = True
+    try:
+        notify._send(cfg.ntfy_url, "BikeHound test notification", "BikeHound check", tags="dog")
+        print("Test notification sent.")
+    except httpx.HTTPError as e:
+        print(f"Test notification FAILED: {e}")
+        ok = False
     for platform in cfg.platforms:
         try:
             found = SOURCES[platform](cfg, today(), max_pages=1)
-        except Blocked as e:
-            print(f"{platform}: FAILED, {e}")
+        except Exception as e:  # noqa: BLE001, why() logs the traceback
+            print(f"{platform}: FAILED, {why(platform, e)}")
             ok = False
             continue
         with photo_client() as client:
@@ -76,8 +84,31 @@ def today():
     return datetime.now().astimezone().date()
 
 
+def why(platform: str, e: Exception) -> str:
+    """The reason a platform failed. Anything but Blocked is unexpected: logged with traceback."""
+    if isinstance(e, Blocked):
+        return str(e)
+    log.exception("%s: search failed", platform)
+    return f"{type(e).__name__}: {e}. The site probably changed; see the log."
+
+
 def run(args) -> int:
     cfg = load(Path(args.config))
+    try:
+        return _run(args, cfg)
+    except ConfigError:
+        raise
+    except Exception as e:
+        # anything unexpected still ends in a notification, or an unattended run dies silently
+        log.exception("run crashed")
+        try:
+            notify.crashed(cfg.ntfy_url, f"{type(e).__name__}: {e}")
+        except httpx.HTTPError as ne:
+            log.warning("could not send the crash notification: %s", ne)
+        return 1
+
+
+def _run(args, cfg) -> int:
     store = Store(cfg.data_dir / "bikehound.sqlite")
     started = now()
     if today() > cfg.active_until:
@@ -86,7 +117,7 @@ def run(args) -> int:
             store.record_run(started, False, "stopped")
         return 0
     if store.too_soon() and not args.force:
-        print("Last successful run was less than 12 hours ago, exiting (--force overrides).")
+        log.info("last successful run was less than 12 hours ago, exiting (--force overrides)")
         return 0
 
     model = load_model()
@@ -103,21 +134,25 @@ def run(args) -> int:
                 if last is None
                 else max(cfg.stolen_on, last.astimezone().date() - timedelta(days=1))
             )
+            log.info("%s: searching since %s", platform, since)
             listings = search(cfg, since)
-        except Blocked as e:
-            status[platform] = f"failed: {e}"
+        except Exception as e:  # noqa: BLE001, why() logs the traceback
+            reason = why(platform, e)
+            log.warning("%s: failed, %s", platform, reason)
+            status[platform] = f"failed: {reason}"
             try:
-                notify.failure(cfg.ntfy_url, platform, str(e))
+                notify.failure(cfg.ntfy_url, platform, reason)
             except httpx.HTTPError as ne:
-                print(f"Could not send failure notification: {ne}")
+                log.warning("could not send the failure notification: %s", ne)
             continue
         new = [l for l in listings if not store.is_seen(l.platform, l.id)]
-        print(f"{platform}: scoring {len(new)} new listings")
+        log.info("%s: %d listings, scoring %d new", platform, len(listings), len(new))
         unsent = 0
         with photo_client() as client:
             for l in new:
                 photo = 0.0 if frame_hit(l, cfg) else listing_photo_score(model, refs, client, l)
                 s = score(l, cfg, photo)
+                log.debug("%.2f  %s  %s  %s", s.total, s.reasons(), l.title[:60], l.url)
                 if not s.notify(cfg.threshold):
                     store.record(l.platform, l.id, s.total, False)
                 elif last is None:  # first run for this platform: one digest, not a flood
@@ -126,8 +161,10 @@ def run(args) -> int:
                     try:
                         notify.match(cfg.ntfy_url, l, s)
                         store.record(l.platform, l.id, s.total, True)
-                    except httpx.HTTPError:
+                        log.info("%s: notified %.2f %s", platform, s.total, l.url)
+                    except httpx.HTTPError as e:
                         # unrecorded, so the next run retries it
+                        log.warning("%s: notification deferred, %s", platform, e)
                         unsent += 1
         if last is None:
             backfilled.append(platform)  # marked ok only once its digest is out, see below
@@ -147,14 +184,22 @@ def run(args) -> int:
             store.mark_ok(platform, started)
     # a run limited with --platform does not count for the 12 h guard, so it never makes the
     # next full (cron) run skip; `since` is per platform, so nothing is searched twice
-    store.record_run(started, not args.platform, "; ".join(f"{k} {v}" for k, v in status.items()))
-    print(status)
-    return 0
+    summary = "; ".join(f"{k} {v}" for k, v in status.items())
+    store.record_run(started, not args.platform, summary)
+    log.info("done: %s", summary)
+    # nonzero when a platform failed or notifications were deferred, for systemd/Docker
+    bad = any(v.startswith("failed") or "deferred" in v for v in status.values())
+    return 1 if bad or len(sent) < len(digest) else 0
 
 
 def main() -> None:
     p = argparse.ArgumentParser(prog="bikehound")
     p.add_argument("-c", "--config", default="config.yaml")
+    g = p.add_mutually_exclusive_group()
+    g.add_argument("-q", "--quiet", action="store_true", help="log warnings and errors only")
+    g.add_argument(
+        "-v", "--verbose", action="count", default=0, help="-v: debug, -vv: also other libraries"
+    )
     sub = p.add_subparsers(dest="cmd", required=True)
     for name, fn in (("init", init), ("check", check)):
         sub.add_parser(name).set_defaults(fn=fn)
@@ -168,6 +213,13 @@ def main() -> None:
         help="search only this platform instead of the config's list (repeatable)",
     )
     args = p.parse_args()
+    # -vv lets every library through (httpx logs each request); below that only bikehound's own
+    logging.basicConfig(
+        level=logging.DEBUG if args.verbose >= 2 else logging.WARNING,
+        format="%(asctime)s %(levelname)-7s %(name)s: %(message)s",
+    )
+    level = logging.WARNING if args.quiet else logging.DEBUG if args.verbose else logging.INFO
+    logging.getLogger("bikehound").setLevel(level)
     try:
         sys.exit(args.fn(args))
     except ConfigError as e:

@@ -69,6 +69,15 @@ def failure(url: str, platform: str, why: str) -> None:
     )
 
 
+def crashed(url: str, why: str) -> None:
+    _send(
+        url,
+        f"The run stopped on an unexpected error: {why}. See the log.",
+        "BikeHound: run crashed",
+        tags="warning",
+    )
+
+
 def stopped(url: str, until) -> None:
     _send(
         url,
