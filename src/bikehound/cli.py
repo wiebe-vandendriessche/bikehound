@@ -38,6 +38,10 @@ def check(args) -> int:
     print(
         f"Config ok, {len(refs)} reference photos embedded, platforms: {', '.join(cfg.platforms)}"
     )
+    if "model" not in cfg.keywords and "brand" in cfg.keywords:
+        # measured: a common brand fills Marktplaats' far cap of 1000 listings in two days
+        print("Warning: no `model` keywords, so the nationwide search uses the brand words. For a "
+              "common brand that is hundreds of listings a day and many lookalike notifications.")  # fmt: skip
     notify._send(cfg.ntfy_url, "BikeHound test notification", "BikeHound check", tags="dog")
     print("Test notification sent.")
     ok = True

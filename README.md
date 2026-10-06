@@ -79,7 +79,8 @@ listings would contain:
 - **Avoid short, generic words.** A short word also matches inside longer words and other
   brands' names. Prefer the full name as a phrase, and add the spellings sellers use (with and
   without spaces or dashes).
-- **Put the model name in `model`,** not in `brand`.
+- **Put the model name in `model`,** not in `brand`. Without a `model` group the nationwide search
+  uses the brand words, which for a common brand means many lookalike notifications.
 - **Numbers match whole numbers only:** `28` does not match `280` or `28.5`, but it still
   matches every "28 inch" wheel. Use the full model number instead of a bare number.
 - **Check before you run:** `bikehound check` prints how many listings on the first page would
