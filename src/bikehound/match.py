@@ -69,6 +69,26 @@ def found(word: str, text: str) -> bool:
     return re.search(pattern, text) is not None
 
 
+def word_warnings(keywords: dict) -> list[str]:
+    """Words that also match other bikes' listings, given how found() matches."""
+    out = []
+    for name, g in keywords.items():
+        for w in g.words:
+            n = norm(w).strip()
+            if n.isdigit():
+                out.append(f'keywords.{name}: "{w}" is a bare number and matches every listing '
+                           "with it (28 inch wheels, frame sizes); use the full model number")  # fmt: skip
+            elif n.isalpha() and len(n) < 4:
+                out.append(f'keywords.{name}: "{w}" is short and also matches inside longer '
+                           "words; prefer a longer word or a phrase")  # fmt: skip
+    if "model" not in keywords and "brand" in keywords:
+        # measured: a common brand fills Marktplaats' far cap of 1000 listings in two days
+        out.append("no `model` keywords, so the nationwide search uses the brand words. For a "
+                   "common brand that is hundreds of listings a day and many lookalike "
+                   "notifications.")  # fmt: skip
+    return out
+
+
 def score(listing: Listing, cfg: Config, photo: float = 0.0) -> Score:
     if frame_hit(listing, cfg):
         return Score(total=1.0 + photo, photo=photo, frame_hit=True)

@@ -8,9 +8,17 @@ from pathlib import Path
 
 import httpx
 
-from . import notify
+from . import notify, wizard
 from .config import PLATFORMS, ConfigError, load
-from .match import frame_hit, listing_photo_score, load_model, reference_embeddings, score
+from .match import (
+    PHOTO_EXT,
+    frame_hit,
+    listing_photo_score,
+    load_model,
+    reference_embeddings,
+    score,
+    word_warnings,
+)
 from .sources import SOURCES, Blocked
 from .sources.lrp import UA
 from .store import Store, now
@@ -23,10 +31,25 @@ def init(args) -> int:
     if dest.exists():
         print(f"{dest} already exists, not overwriting")
         return 1
+    asked = sys.stdin.isatty()  # cron or `docker run` without -it gets the plain template
+    v = wizard.interactive() if asked else wizard.EXAMPLE
     text = files("bikehound").joinpath("config.example.yaml").read_text(encoding="utf-8")
-    dest.write_text(text.replace("{topic}", f"bikehound-{secrets.token_hex(12)}"), encoding="utf-8")
-    (dest.parent / "reference").mkdir(exist_ok=True)  # where the README says the photos go
-    print(f"Wrote {dest}. Edit it, put photos in reference/, then run `bikehound check`.")
+    text = wizard.render(text, v).replace("{topic}", f"bikehound-{secrets.token_hex(12)}")
+    dest.write_text(text, encoding="utf-8")
+    ref = dest.parent / "reference"  # where the README says the photos go
+    ref.mkdir(exist_ok=True)
+    copied = wizard.copy_photos(v["photos"], ref)
+    cfg = load(dest)  # an error here is a bug in init, not in the answers
+    print(f"Wrote {dest}." + ("" if asked else " Edit it to describe your bike."))
+    for w in word_warnings(cfg.keywords):
+        print(f"Warning: {w}")
+    if not cfg.keywords:
+        print("No keywords: matching relies on the photos alone.")
+    n = sum(p.suffix.lower() in PHOTO_EXT for p in ref.iterdir())
+    print(
+        f"{n} photos in {ref} ({copied} copied now)." if n else f"Put photos of your bike in {ref}."
+    )
+    print(f"Subscribe in the ntfy app to {cfg.ntfy_url}, then run `bikehound check`.")
     return 0
 
 
@@ -41,11 +64,8 @@ def check(args) -> int:
     print(
         f"Config ok, {len(refs)} reference photos embedded, platforms: {', '.join(cfg.platforms)}"
     )
-    if "model" not in cfg.keywords and "brand" in cfg.keywords:
-        # measured: a common brand fills Marktplaats' far cap of 1000 listings in two days
-        log.warning("no `model` keywords, so the nationwide search uses the brand words. For a "
-                    "common brand that is hundreds of listings a day and many lookalike "
-                    "notifications.")  # fmt: skip
+    for w in word_warnings(cfg.keywords):
+        log.warning(w)
     ok = True
     try:
         notify._send(cfg.ntfy_url, "BikeHound test notification", "BikeHound check", tags="dog")

@@ -17,6 +17,7 @@ reference/*
 .env.*
 *.pem
 *.key
+/backup
 
 # --- Python ---
 __pycache__/

@@ -59,7 +59,7 @@ own platform risk.
 | D11 | Paging stops once a page ends before `since`: the theft date on the first run, else the last successful run minus one day. Only unseen listing IDs are scored. Backfill is bounded by the page cap. | No duplicate work, no duplicate notifications. Platforms sort by *bump* date, so already-seen listings fill every page and "stop at a page with nothing new" never triggers. |
 | D12 | Listings without a usable location are kept, not dropped. | Missing a bike is worse than a false positive. |
 | D13 | Notifications through ntfy (one HTTP POST, photo attached, link as click action). A random topic is generated at `init`. | Free, open source, self-hostable, no account, no extra dependency. |
-| D14 | Config is a commented YAML file plus a folder of reference photos. Commands: `init`, `check`, `run` (no `login`: no source needs an account, D23, D24). | Technical users prefer a documented file over a wizard; `check` gives immediate feedback. |
+| D14 | Config is a commented YAML file plus a folder of reference photos, written by `init` from a few questions (plain template when stdin is not a terminal). Commands: `init`, `check`, `run` (no `login`: no source needs an account, D23, D24). | Technical users prefer a documented file over a wizard; `check` gives immediate feedback. |
 | D15 | Polite behaviour fixed in code: one sequential pass, page cap per search, random pauses, normal user agent; `run` refuses to start within 12 h of the last successful run. | Protects the user's accounts and IP against a misconfigured cron. |
 | D16 | One SQLite file with only `seen` and `runs`; rows older than 180 days are pruned. | Minimal data, no seller information, stdlib `sqlite3`. |
 | D17 | `active_until` (default: theft date + 1 year) ends the search with one final notification. | Protects against forgotten cron jobs; the human decides when the bike is found. |
@@ -117,7 +117,7 @@ own platform risk.
 
 | Command | What it does |
 |---|---|
-| `bikehound init` | Copies `config.example.yaml` to `config.yaml` with a random ntfy topic. |
+| `bikehound init` | Asks about the bike, fills `config.example.yaml` with the answers and a random ntfy topic, copies the photos to `reference/` (`wizard.py`). |
 | `bikehound check` | Validates the config, embeds the reference photos, sends a test notification and runs one small search per enabled platform. |
 | `bikehound run` | The daily job. |
 

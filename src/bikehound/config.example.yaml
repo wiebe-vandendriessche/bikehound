@@ -1,25 +1,23 @@
 # BikeHound config, one bike per file.
 bike:
-  stolen_on: 2026-09-20
+  stolen_on: $stolen_on
   # active_until: 2027-09-20     # optional, default stolen_on + 1 year
-  # frame_number: "WXYZ12345"    # optional, a hit always notifies
+  $frame_line
   reference_dir: reference/      # side views with the whole frame + distinctive details
 
 location:
-  postcode: "9000"
-  country: BE
-  radius_km: 50
+  postcode: "$postcode"
+  country: $country
+  radius_km: $radius_km
 
 # Opt-in: vinted, facebook. Their terms forbid automated access; read the README first.
-platforms: [2dehands, marktplaats]
+platforms: $platforms
 
 # Any group name. Words in every language the platforms use.
 # Default weights: brand 0.3, model 0.4, anything else 0.1.
 # Words match anywhere in the text: prefer full names as phrases over short, generic words.
 keywords:
-  brand: { words: [cortina] }
-  model: { words: [e-u4, eu4, "e u4"] }
-  color: { words: [felgroen, groen, green, vert], weight: 0.3 }
+$keywords
 
 # A listing notifies when photo score + matched keyword weights >= threshold.
 # Photo score: 0 for a typical bike photo, 0.5 for the closest 1% of listings.

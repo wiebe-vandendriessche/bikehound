@@ -59,10 +59,15 @@ uv run playwright install chromium   # only for Vinted and Facebook
 ### 2. Create your config
 
 ```bash
-uv run bikehound init        # writes config.yaml with a private notification topic
+uv run bikehound init
 ```
 
-Open `config.yaml` and describe your bike. Every field is commented; the important ones:
+`init` asks a few questions: the theft date, your postcode and search radius, the frame
+number, brand, model and colour, whether to add Vinted and Facebook, and where your photos are.
+It writes `config.yaml` with a private notification topic, adds the spellings sellers use for
+the model name (`E-U4` becomes `e-u4`, `e u4`, `eu4`) and the colour in Dutch, French and
+English, copies the photos into `reference/` and warns about keywords likely to match other
+bikes. You can edit `config.yaml` afterwards; every field is commented. The important ones:
 
 | Field | What to put in it |
 |---|---|
@@ -92,7 +97,8 @@ listings would contain:
 
 ### 3. Add photos of your bike
 
-Put one or more photos in the `reference/` folder (jpg, png or webp). Best: a side view showing
+`init` copies the photos you point it to into the `reference/` folder; you can add more there
+later (jpg, png or webp). Best: a side view showing
 the whole bike, plus close-ups of anything distinctive. No photo of the actual bike? A catalogue
 photo of the same model works too, but expects more lookalikes.
 
@@ -149,8 +155,9 @@ photos and data live there, outside the image):
 ```bash
 docker build -t bikehound .
 mkdir mybike
-docker run --rm --user "$(id -u):$(id -g)" -v "$PWD/mybike:/bike" bikehound init
-# edit mybike/config.yaml, put photos in mybike/reference/, then:
+# put photos of your bike in mybike/ first: inside the container that folder is /bike
+docker run --rm -it --user "$(id -u):$(id -g)" -v "$PWD/mybike:/bike" bikehound init
+# answer the questions (photos: /bike/<file name>), then:
 docker run --rm --user "$(id -u):$(id -g)" -v "$PWD/mybike:/bike" bikehound check
 ```
 
