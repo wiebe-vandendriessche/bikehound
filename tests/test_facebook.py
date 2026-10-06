@@ -65,8 +65,6 @@ def test_far_uses_model_words_in_the_country_area():
     assert site.calls[-1][1]["query"] == ["e-u4"]
 
 
-def test_all_bands_empty_or_unknown_country_blocks():
+def test_all_bands_empty_blocks():
     with pytest.raises(Blocked):
         search(cfg(keywords={}), date(2026, 10, 1), fetch=FakeSite({}))
-    with pytest.raises(Blocked):
-        search(cfg(country="FR"), date(2026, 10, 1), fetch=FakeSite({"0": page(("a", 6))}))

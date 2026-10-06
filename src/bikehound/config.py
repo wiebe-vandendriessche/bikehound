@@ -4,7 +4,8 @@ from pathlib import Path
 
 import yaml
 
-PLATFORMS = {"2dehands", "marktplaats", "vinted", "leboncoin", "facebook"}
+PLATFORMS = {"2dehands", "marktplaats", "vinted", "facebook"}
+COUNTRIES = {"BE", "NL"}  # BikeHound covers Belgian and Dutch marketplaces
 DEFAULT_WEIGHTS = {"brand": 0.3, "model": 0.4}
 OTHER_WEIGHT = 0.1
 
@@ -27,8 +28,6 @@ class Config:
     reference_dir: Path
     postcode: str
     country: str
-    lat: float | None
-    lon: float | None
     radius_km: int
     platforms: list[str]
     keywords: dict[str, Group]
@@ -65,6 +64,10 @@ def load(path: Path) -> Config:
     until = bike.get("active_until")
     until = _date(until, "bike.active_until") if until else stolen + timedelta(days=365)
 
+    country = str(_need(loc, "country", "location")).upper()
+    if country not in COUNTRIES:
+        raise ConfigError(f"location.country must be BE or NL, got {country!r}")
+
     platforms = raw.get("platforms") or ["2dehands", "marktplaats"]
     if bad := set(platforms) - PLATFORMS:
         raise ConfigError(f"unknown platforms {sorted(bad)}, choose from {sorted(PLATFORMS)}")
@@ -91,9 +94,7 @@ def load(path: Path) -> Config:
         frame_number=bike.get("frame_number"),
         reference_dir=base / bike.get("reference_dir", "reference"),
         postcode=str(_need(loc, "postcode", "location")),
-        country=str(_need(loc, "country", "location")),
-        lat=loc.get("lat"),
-        lon=loc.get("lon"),
+        country=country,
         radius_km=int(_need(loc, "radius_km", "location")),
         platforms=platforms,
         keywords=keywords,

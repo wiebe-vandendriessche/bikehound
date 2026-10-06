@@ -38,13 +38,14 @@ def check(args) -> int:
     print(
         f"Config ok, {len(refs)} reference photos embedded, platforms: {', '.join(cfg.platforms)}"
     )
+    if "model" not in cfg.keywords and "brand" in cfg.keywords:
+        # measured: a common brand fills Marktplaats' far cap of 1000 listings in two days
+        print("Warning: no `model` keywords, so the nationwide search uses the brand words. For a "
+              "common brand that is hundreds of listings a day and many lookalike notifications.")  # fmt: skip
     notify._send(cfg.ntfy_url, "BikeHound test notification", "BikeHound check", tags="dog")
     print("Test notification sent.")
     ok = True
     for platform in cfg.platforms:
-        if platform not in SOURCES:
-            print(f"{platform}: source not implemented yet")
-            continue
         try:
             found = SOURCES[platform](cfg, today(), max_pages=1)
         except Blocked as e:
@@ -92,10 +93,8 @@ def run(args) -> int:
     refs = reference_embeddings(model, cfg)
     status, digest, backfilled = {}, [], []
     for platform in args.platform or cfg.platforms:
-        search = SOURCES.get(platform)
+        search = SOURCES[platform]
         try:
-            if search is None:
-                raise Blocked("source not implemented yet")
             # per platform, so a platform that was blocked or newly enabled catches up;
             # day-precision dates, so overlap a day; seen filters the repeats
             last = store.last_ok(platform)

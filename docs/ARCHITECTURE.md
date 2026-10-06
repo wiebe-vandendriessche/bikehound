@@ -1,12 +1,13 @@
 # BikeHound architecture
 
-Status: design, agreed 2026-10-05. Implemented: config, store, notify (incl. first-run digest),
+Status: design agreed 2026-10-05 and implemented: config, store, notify (incl. first-run digest),
 text and photo scoring, CLI (`init`, `check`, `run`), the 2dehands/Marktplaats source, the
-browser helper, the Vinted source and the Facebook source (logged out, best effort, D24).
+browser helper, the Vinted source, the Facebook source (logged out, best effort, D24) and a
+Dockerfile.
 
 ## 1. Purpose and scope
 
-BikeHound searches second-hand marketplaces once a day for one stolen bike and sends the owner a
+BikeHound searches Belgian and Dutch second-hand marketplaces once a day for one stolen bike and sends the owner a
 push notification for every listing that might be it. The owner looks at the photo and decides.
 
 Guiding rule: **a false positive costs the owner five seconds; a missed bike costs the bike.**
@@ -19,7 +20,8 @@ own platform risk.
 ### In scope
 
 - A command-line tool, run once a day by the host's scheduler (cron, systemd timer, Docker).
-- Five marketplaces: 2dehands.be, Marktplaats.nl, Vinted, Leboncoin, Facebook Marketplace.
+- Four marketplaces used in Belgium and the Netherlands: 2dehands.be, Marktplaats.nl, Vinted,
+  Facebook Marketplace. `country` is `BE` or `NL`.
 - Matching on photos (local image model) plus a text bonus for configured keywords.
 - Push notifications through ntfy.
 - One bike per config file.
@@ -30,7 +32,8 @@ own platform risk.
 |---|---|
 | Hosted service, web UI, user accounts | Would make the maintainer run scrapers on behalf of others and hold their personal data. |
 | Built-in scheduler or long-running daemon | Runs once a day; cron/systemd/Docker already schedule. |
-| Plugin system for marketplaces | Five sources in one repo; new ones arrive as a pull request. |
+| Marketplaces outside Belgium and the Netherlands | Keeps the sources few enough to maintain and to verify by hand. |
+| Plugin system for marketplaces | Four sources in one repo; new ones arrive as a pull request. |
 | Bot-protection bypass (stealth plugins, paid proxies, CAPTCHA solvers) | Costs money, is an arms race, and actively circumvents platform security. |
 | Creating or recommending throwaway accounts | Also against platform terms. |
 | LLM or paid API in the matching | Costs per listing and sends photos to a third party; may also reject a true match. |
@@ -44,9 +47,9 @@ own platform risk.
 | # | Decision | Rationale |
 |---|---|---|
 | D1 | Audience: technical users who self-host. | Generic without needing a hosted service. |
-| D2 | One-shot CLI (`bikehound run`), scheduled by the host; an official Docker image as an alternative install. | No daemon to keep alive; a home IP has the best chance against bot protection. |
-| D3 | All five marketplaces in v1. 2dehands and Marktplaats on by default; Vinted, Leboncoin and Facebook opt-in. | The user chooses their own platform and account risk. |
-| D4 | 2dehands/Marktplaats through their shared JSON API over plain HTTP. Vinted, Leboncoin and Facebook through Playwright with a real Chromium and a persistent profile per platform. Where the page fetches JSON, the source reads that response instead of scraping selectors. | One browser mechanism for the hard platforms; intercepted JSON breaks less often than CSS selectors. |
+| D2 | One-shot CLI (`bikehound run`), scheduled by the host; a Dockerfile as an alternative install (built locally, not published). | No daemon to keep alive; a home IP has the best chance against bot protection. |
+| D3 | Four marketplaces in v1. 2dehands and Marktplaats on by default; Vinted and Facebook opt-in. | Vinted's and Facebook's terms forbid automated access and both actively block it; the user chooses to take that risk. |
+| D4 | 2dehands/Marktplaats through their shared JSON API over plain HTTP. Vinted and Facebook through Playwright with a real Chromium and a persistent profile per platform. Where the page fetches JSON, the source reads that response instead of scraping selectors. | One browser mechanism for the hard platforms; intercepted JSON breaks less often than CSS selectors. |
 | D5 | On a block, CAPTCHA or expired session: skip that platform for this run, notify the user, no retry. | Fail soft and visibly; never escalate. |
 | D6 | One Python module per platform exposing `search()`, registered in a plain dict. | Adding a platform is one file plus one line. No base class, no entry points. |
 | D7 | Photo score from a local image model (SigLIP2-base via `transformers`, CPU-only torch) on the whole photo, cosine similarity, highest pair across the first 3 listing photos x all reference photos. Rescaled so the measured median of unrelated listings (0.55) maps to 0 and their 99th percentile (0.71) to 0.5. Default `threshold` 0.5. | Free, private, works offline; one good photo is enough. Chosen over DINOv2 by a measured bake-off (below). Rescaling keeps the keyword weights meaningful: `brand + model` (0.7) reaches the threshold, `color` alone does not, the photo alone only for about the closest 1% of listings. |
@@ -67,6 +70,10 @@ own platform risk.
 | D22 | `since` and "first run" are tracked per platform (`platform_ok` table). A platform is marked ok only when it was searched without `Blocked`, and on its first run only once its digest is fully sent. | A platform blocked for days, or enabled later, catches up from its own last success instead of searching one day back. |
 | D23 | Browser sources run on BikeHound's own logged-out profile; BikeHound never logs in to a user's personal account and never creates accounts. | Protects the user's own accounts; account creation is against platform terms (section 1). |
 | D24 | Facebook logged out, best effort: one bikes page per price band (6) plus one text search per far word, in a fixed big-city area per country (`brussels`, `amsterdam`). No account, no login, no backfill, no radius. | A login needs an account and identity checks; logged out, one page is a stale 24-listing sample, but the price-band union covers several days. Partial coverage beats none (section 1). |
+| D25 | Location is `postcode`, `country` and `radius_km`; no coordinates in the config and no client-side radius filter. | Only 2dehands and Marktplaats take a radius, and they apply it server-side; Vinted and Facebook carry no coordinates. Old configs with `lat`/`lon` still load (the keys are ignored). |
+| D26 | Silent breakage raises `Blocked`: zero listings on the first near page (2dehands, Marktplaats, Vinted), or all price bands empty (Facebook). | A bike category within a radius, or a whole country's newest bikes, is never empty; zero means a changed page or a block, not a quiet day. |
+| D27 | Page caps: 2dehands/Marktplaats near 50 pages of 100 (the API's 5000-result cap), far 10; Vinted near 10 pages of 96 (the site's cap), far 2; Facebook one page per band or word. The first run backfills only as far as the caps reach. | Polite volume; the measured reach is in the per-platform facts below. |
+| D28 | The far search keeps its fallback to brand words when no `model` group is set; `check` warns about it. | Measured 2026-10-06, brand-only far search, listings bumped today or yesterday: Marktplaats hit the 1000-listing cap for Gazelle and Batavus and found 743 for Cortina; 2dehands 21 to 206. That is minutes of CPU, but brand (0.3) plus a photo score of 0.2 notifies about 5% of them. A far search with lookalikes still beats none. |
 
 ## 3. Components
 
@@ -82,8 +89,7 @@ own platform risk.
  │ YAML → dataclass│   │  lrp.py  (2dehands,  │      │ SQLite: seen,    │
  │ + validation    │   │           marktplaats│      │ runs, pruning,   │
  └─────────────────┘   │  vinted.py           │      │ 12 h guard       │
-                       │  leboncoin.py        │      └──────────────────┘
-                       │  facebook.py         │
+                       │  facebook.py         │      └──────────────────┘
                        │  __init__.py: dict   │
                        └──────────┬───────────┘
                                   │ list[Listing]
@@ -141,9 +147,8 @@ With several bikes, each config file gets its own `data/` folder next to it.
      page cap is reached;
    - on `Blocked`, record the failure, send a failure notification and continue with the next
      platform.
-4. **Filter.** Drop listings already in `seen`. Where a listing has coordinates and the platform
-   ignored the radius, drop listings beyond `radius_km` (near search only; 2dehands and
-   Marktplaats apply the radius themselves). Keep listings without a location.
+4. **Filter.** Drop listings already in `seen`. The radius is applied by the platforms that
+   support one; listings without a location are kept.
 5. **Score.** For each listing:
    - frame number in the text → match, done;
    - download photos into memory (HTTP, or through the Playwright context for browser sources),
@@ -170,18 +175,16 @@ bike:
 location:
   postcode: "9000"
   country: BE
-  lat: 51.05
-  lon: 3.72
   radius_km: 50
 
-platforms: [2dehands, marktplaats]   # opt-in: vinted, leboncoin, facebook (see README warnings)
+platforms: [2dehands, marktplaats]   # opt-in: vinted, facebook (see README warnings)
 
 keywords:                        # any group name; words in every language the platforms use
   brand: { words: [cortina] }                                  # default weight 0.3
   model: { words: [e-u4, eu4, "e u4"] }                        # default weight 0.4
   color: { words: [felgroen, groen, green, vert], weight: 0.3 } # default 0.1, raised: rare colour
 
-threshold: 0.75                  # placeholder, see open questions
+threshold: 0.5
 
 ntfy:
   url: https://ntfy.sh/bikehound-3f9c…   # generated by `init`; the topic name is the secret
@@ -306,7 +309,7 @@ search results carry one photo per listing.
 | Risk | Impact | Mitigation |
 |---|---|---|
 | Platform changes its API or page structure | That source returns nothing or fails | Fetch/parse split, fixtures make repair quick; failures are reported to the user, not swallowed. A source that silently returns zero results is the dangerous case (see open questions). |
-| Bot protection (Vinted, Leboncoin: Datadome) | Source blocked, sometimes for days | Real browser, persistent profile, home IP, low volume. When blocked: skip and notify. Accept lower coverage. |
+| Bot protection (Vinted: Datadome) | Source blocked, sometimes for days | Real browser, persistent profile, home IP, low volume. When blocked: skip and notify. Accept lower coverage. |
 | Headless browsers are easier to detect | More blocks on servers without a display | Document running headed (e.g. under `xvfb-run`) as an option; no stealth tricks. |
 | Facebook closes anonymous access | Facebook source stops | No account is used (D24). All bands empty raises `Blocked`: the user gets a failure notification, the other sources continue. |
 | Terms of service | Automated access is forbidden on several platforms | Personal use only, stated in the README; no circumvention; responsibility lies with the user. |
