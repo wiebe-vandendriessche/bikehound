@@ -33,7 +33,6 @@ your bike, you get a notification on your phone with a photo and a link.
 - 2dehands.be
 - Marktplaats.nl
 - Vinted (opt-in)
-- Leboncoin (planned)
 - Facebook Marketplace (opt-in, best effort, no account)
 
 ## Usage

@@ -11,23 +11,6 @@ looks the same as "nothing new today" and is the most likely way to miss a bike.
 - **Decided for 2dehands/Marktplaats:** zero results on the first near page raises `Blocked`.
 - **Decided for Vinted:** same rule. The newest bikes in a whole country are never empty.
 - **Decided for Facebook:** `Blocked` when all price bands are empty (login wall or changed page).
-- **To check:** whether that holds for Leboncoin.
-
-## 4. Location per platform
-
-Each platform takes a location differently (postcode, coordinates, profile setting) and not all
-return coordinates per listing.
-
-- **To find out:** per platform, how to pass the location and radius, and whether listings carry
-  coordinates.
-- **Known for 2dehands/Marktplaats:** `postcode` + `distanceMeters`, applied server-side; a
-  postcode from the other country is silently ignored. Listings carry coordinates.
-- **Known for Facebook (logged out):** big-city slugs only, `radius`, coordinates and city ids
-  ignored; the source uses a fixed area per country (D24).
-- **Known for Vinted:** no location search and no location on catalog cards; near is
-  country-wide (see ARCHITECTURE.md).
-- **Decides:** where the client-side radius filter applies, and whether `lat`/`lon` in the
-  config can be dropped in favour of postcode only.
 
 ## 5. Page caps and backfill depth
 

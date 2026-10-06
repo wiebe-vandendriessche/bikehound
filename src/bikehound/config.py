@@ -4,7 +4,7 @@ from pathlib import Path
 
 import yaml
 
-PLATFORMS = {"2dehands", "marktplaats", "vinted", "leboncoin", "facebook"}
+PLATFORMS = {"2dehands", "marktplaats", "vinted", "facebook"}
 DEFAULT_WEIGHTS = {"brand": 0.3, "model": 0.4}
 OTHER_WEIGHT = 0.1
 
@@ -27,8 +27,6 @@ class Config:
     reference_dir: Path
     postcode: str
     country: str
-    lat: float | None
-    lon: float | None
     radius_km: int
     platforms: list[str]
     keywords: dict[str, Group]
@@ -92,8 +90,6 @@ def load(path: Path) -> Config:
         reference_dir=base / bike.get("reference_dir", "reference"),
         postcode=str(_need(loc, "postcode", "location")),
         country=str(_need(loc, "country", "location")),
-        lat=loc.get("lat"),
-        lon=loc.get("lon"),
         radius_km=int(_need(loc, "radius_km", "location")),
         platforms=platforms,
         keywords=keywords,

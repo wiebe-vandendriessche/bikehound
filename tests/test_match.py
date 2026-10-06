@@ -16,8 +16,6 @@ def cfg(**kw) -> Config:
         "reference_dir": Path("reference"),
         "postcode": "9000",
         "country": "BE",
-        "lat": None,
-        "lon": None,
         "radius_km": 50,
         "platforms": ["2dehands"],
         "threshold": 0.5,

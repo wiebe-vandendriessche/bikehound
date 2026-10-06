@@ -8,11 +8,9 @@ bike:
 location:
   postcode: "9000"
   country: BE
-  lat: 51.05
-  lon: 3.72
   radius_km: 50
 
-# Opt-in: vinted, leboncoin, facebook (read the README warnings first)
+# Opt-in: vinted, facebook (read the README warnings first)
 platforms: [2dehands, marktplaats]
 
 # Any group name. Words in every language the platforms use.
