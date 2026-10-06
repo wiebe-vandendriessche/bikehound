@@ -24,7 +24,7 @@ your bike, you get a notification on your phone with a photo and a link.
 - Marktplaats.nl
 - Vinted (opt-in)
 - Leboncoin (planned)
-- Facebook Marketplace (planned)
+- Facebook Marketplace (opt-in, best effort, no account)
 
 ## Usage
 
@@ -133,6 +133,11 @@ stops searching. Move the date to keep searching.
   day; the next run tries again. Repeated failures usually mean the site changed.
 - **Too many or too few notifications?** Raise or lower `threshold` in steps of 0.05 and look
   at the scores in `bikehound check` and in the notifications.
+- **Facebook** is searched logged out, without any account. Facebook shows anonymous visitors
+  only a limited view, so BikeHound reads one page per price range plus one search per model
+  word. It covers recent listings (no search back to the theft date) in a wide area around
+  Brussels (`country: BE`) or Amsterdam (`NL`) that Facebook chooses; `radius_km` does not apply.
+  If Facebook starts requiring a login, you get a "facebook failed" notification.
 - **Vinted** is searched with BikeHound's own browser profile in `data/profiles/vinted/`,
   logged out. BikeHound never logs in with your account. If Vinted starts blocking it, try
   `BIKEHOUND_HEADED=1` (on a server without a screen: under `xvfb-run`).

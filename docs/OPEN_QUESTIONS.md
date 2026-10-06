@@ -10,16 +10,8 @@ looks the same as "nothing new today" and is the most likely way to miss a bike.
 
 - **Decided for 2dehands/Marktplaats:** zero results on the first near page raises `Blocked`.
 - **Decided for Vinted:** same rule. The newest bikes in a whole country are never empty.
-- **To check:** whether that holds for Leboncoin and Facebook.
-
-## 3. Facebook login with Docker
-
-`bikehound login facebook` needs a visible browser; a container has no display.
-
-- **A.** Log in with a local install (`uv tool install`), then mount the profile folder into
-  the container.
-- **B.** Run the login command in the container with a forwarded display (X11 or noVNC).
-- **Leaning:** A, documentation only, no extra code.
+- **Decided for Facebook:** `Blocked` when all price bands are empty (login wall or changed page).
+- **To check:** whether that holds for Leboncoin.
 
 ## 4. Location per platform
 
@@ -30,6 +22,8 @@ return coordinates per listing.
   coordinates.
 - **Known for 2dehands/Marktplaats:** `postcode` + `distanceMeters`, applied server-side; a
   postcode from the other country is silently ignored. Listings carry coordinates.
+- **Known for Facebook (logged out):** big-city slugs only, `radius`, coordinates and city ids
+  ignored; the source uses a fixed area per country (D24).
 - **Known for Vinted:** no location search and no location on catalog cards; near is
   country-wide (see ARCHITECTURE.md).
 - **Decides:** where the client-side radius filter applies, and whether `lat`/`lon` in the
