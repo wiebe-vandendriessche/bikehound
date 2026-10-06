@@ -5,7 +5,7 @@ description = "Sniffs out your stolen bike on second-hand marketplaces, every da
 readme = "README.md"
 license = "AGPL-3.0-only"
 requires-python = ">=3.14"
-dependencies = ["httpx", "pillow", "pyyaml", "torch", "transformers"]  # playwright arrives with the browser sources
+dependencies = ["httpx", "pillow", "playwright", "pyyaml", "torch", "transformers"]
 
 [project.scripts]
 bikehound = "bikehound.cli:main"

@@ -22,7 +22,7 @@ your bike, you get a notification on your phone with a photo and a link.
 
 - 2dehands.be
 - Marktplaats.nl
-- Vinted (planned)
+- Vinted (opt-in)
 - Leboncoin (planned)
 - Facebook Marketplace (planned)
 
@@ -40,6 +40,7 @@ You need Linux or macOS, [uv](https://docs.astral.sh/uv/) and about 3 GB of free
 git clone https://github.com/wiebe-vandendriessche/bikehound.git
 cd bikehound
 uv sync                      # installs Python 3.14 and the dependencies
+uv run playwright install chromium   # only for Vinted
 ```
 
 ### 2. Create your config
@@ -105,6 +106,10 @@ Schedule it with cron (`crontab -e`), for example every morning at 7:
 BikeHound refuses to run again within 12 hours of a successful run, so a misconfigured
 schedule cannot hammer the marketplaces.
 
+To test by hand, `run --force` skips that guard and `run --platform vinted` (repeatable)
+searches only the platforms you name. A run limited with `--platform` does not count for the
+guard, so it never makes your scheduled run skip a day.
+
 ### When does it stop?
 
 On `bike.active_until` (default: one year after the theft) it sends one last notification and
@@ -116,6 +121,9 @@ stops searching. Move the date to keep searching.
   day; the next run tries again. Repeated failures usually mean the site changed.
 - **Too many or too few notifications?** Raise or lower `threshold` in steps of 0.05 and look
   at the scores in `bikehound check` and in the notifications.
+- **Vinted** is searched with BikeHound's own browser profile in `data/profiles/vinted/`,
+  logged out. BikeHound never logs in with your account. If Vinted starts blocking it, try
+  `BIKEHOUND_HEADED=1` (on a server without a screen: under `xvfb-run`).
 - **Several bikes?** Use one config file per bike, each in its own folder, and pass it with
   `uv run bikehound -c path/to/config.yaml run`. Each config gets its own `data/` folder.
 - **Your files:** `config.yaml`, `reference/` and `data/` (seen listings, cached photo

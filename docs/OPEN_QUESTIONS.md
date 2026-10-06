@@ -9,7 +9,8 @@ A source whose page structure changed may return zero listings without raising a
 looks the same as "nothing new today" and is the most likely way to miss a bike.
 
 - **Decided for 2dehands/Marktplaats:** zero results on the first near page raises `Blocked`.
-- **To check:** whether that holds for the browser sources (Vinted and Facebook may be sparse).
+- **Decided for Vinted:** same rule. The newest bikes in a whole country are never empty.
+- **To check:** whether that holds for Leboncoin and Facebook.
 
 ## 3. Facebook login with Docker
 
@@ -29,6 +30,8 @@ return coordinates per listing.
   coordinates.
 - **Known for 2dehands/Marktplaats:** `postcode` + `distanceMeters`, applied server-side; a
   postcode from the other country is silently ignored. Listings carry coordinates.
+- **Known for Vinted:** no location search and no location on catalog cards; near is
+  country-wide (see ARCHITECTURE.md).
 - **Decides:** where the client-side radius filter applies, and whether `lat`/`lon` in the
   config can be dropped in favour of postcode only.
 
@@ -40,6 +43,8 @@ return coordinates per listing.
   the theft date.
 - **Known for 2dehands/Marktplaats:** hard cap of 5000 results per search; near cap 50 pages of
   100, far cap 10 pages.
+- **Known for Vinted:** hard cap of 10 pages of 96; near reads all 10 (about 8 weeks of bikes on
+  vinted.be), far cap 2 pages.
 
 ## 6. Far search volume
 

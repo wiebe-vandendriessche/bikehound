@@ -11,6 +11,7 @@ CREATE TABLE IF NOT EXISTS seen (
   PRIMARY KEY (platform, listing_id));
 CREATE TABLE IF NOT EXISTS runs (
   started_at TEXT, finished_ok INTEGER, status TEXT);
+CREATE TABLE IF NOT EXISTS platform_ok (platform TEXT PRIMARY KEY, last_ok TEXT);
 """
 
 
@@ -48,8 +49,18 @@ class Store:
         self.db.execute("DELETE FROM seen WHERE first_seen < ?", ((now() - KEEP).isoformat(),))
         self.db.commit()
 
-    def first_run(self) -> bool:
-        return self.last_ok_run() is None
+    def last_ok(self, platform: str) -> datetime | None:
+        """Start of the last run in which this platform was searched without being blocked."""
+        q = "SELECT last_ok FROM platform_ok WHERE platform=?"
+        row = self.db.execute(q, (platform,)).fetchone()
+        return datetime.fromisoformat(row[0]) if row else None
+
+    def mark_ok(self, platform: str, when: datetime) -> None:
+        self.db.execute(
+            "INSERT INTO platform_ok VALUES (?,?) ON CONFLICT(platform) DO UPDATE SET last_ok=?",
+            (platform, when.isoformat(), when.isoformat()),
+        )
+        self.db.commit()
 
     def stopped_sent(self) -> bool:
         return self.db.execute("SELECT 1 FROM runs WHERE status='stopped'").fetchone() is not None

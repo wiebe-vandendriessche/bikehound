@@ -1,7 +1,8 @@
 # BikeHound architecture
 
 Status: design, agreed 2026-10-05. Implemented: config, store, notify (incl. first-run digest),
-text and photo scoring, CLI (`init`, `check`, `run`), and the 2dehands/Marktplaats source.
+text and photo scoring, CLI (`init`, `check`, `run`), the 2dehands/Marktplaats source, the
+browser helper and the Vinted source.
 
 ## 1. Purpose and scope
 
@@ -63,6 +64,8 @@ own platform risk.
 | D19 | Python ≥ 3.14; dependencies: `httpx`, `playwright`, `torch`, `transformers`, `pillow`, `pyyaml`. CLI with `argparse`, config validated with a dataclass. Tooling: `pytest`, `ruff`, `pyproject.toml`. | Most mature ecosystem for browser automation and vision models; no extra layers. |
 | D20 | No background removal or bike cropping. | Measured: a bike-detector crop added about 0.01 AUC on top of SigLIP2 while more than doubling CPU time per photo. |
 | D21 | The first run sends one digest (all matches sorted by score, split into messages under 4000 bytes) instead of one push per match. | A backfill of a popular model produced 121 matches; ntfy.sh rate-limits after about 60 messages. |
+| D22 | `since` and "first run" are tracked per platform (`platform_ok` table). A platform is marked ok only when it was searched without `Blocked`, and on its first run only once its digest is fully sent. | A platform blocked for days, or enabled later, catches up from its own last success instead of searching one day back. |
+| D23 | Browser sources run on BikeHound's own logged-out profile; BikeHound never logs in to a user's personal account and never creates accounts. | Protects the user's own accounts; account creation is against platform terms (section 1). |
 
 ## 3. Components
 
@@ -127,7 +130,8 @@ With several bikes, each config file gets its own `data/` folder next to it.
 ## 4. Data flow: from listing to notification
 
 1. **Guards.** If today is after `active_until`: send "stopped" once, exit. If the last successful
-   run was less than 12 hours ago: exit.
+   run was less than 12 hours ago: exit. `since` and "first run" are then taken per platform
+   (D22).
 2. **Prepare.** Load the config, load the model, and load or compute the reference embeddings.
 3. **Search, platform by platform, sequentially.** For each enabled platform:
    - *near*: bike category, within `radius_km`, newest first;
@@ -202,6 +206,37 @@ on 2026-10-05:
   requests a day).
 - Zero listings on the first near page is treated as `Blocked`: a bike category within a radius
   is never empty, so it signals breakage, not a quiet day.
+
+### Vinted (`sources/vinted.py`)
+
+Facts measured on vinted.be on 2026-10-06, logged out, headless Chromium, home IP:
+
+- Protection: Cloudflare (`cf_clearance`) and Datadome. A fresh, logged-out profile gets
+  through headless, and receives an anonymous `access_token_web`. No account needed.
+- The JSON API (`/api/v2/catalog/items`) answers 403 with a block page to an in-page `fetch()`.
+  The catalog page itself is server-rendered and makes no JSON call for its items. So the source
+  navigates catalog pages like a visitor and parses the HTML (deviation from D4's JSON
+  preference: there is no JSON to read).
+- Cards carry stable `data-testid="product-item-id-<id>--..."` attributes: link (`--overlay-link`,
+  whose `title` also holds brand, condition and price), photo (`--image--img`, 310x430 webp),
+  price (`--price-text`). No date, no location, no description, no seller data.
+- Photos: the CDN (`images1.vinted.net`) serves plain `httpx`, so the shared photo download works.
+- 96 items per page, hard cap of 10 pages (page 11 is empty).
+- Categories: 4345 bikes and 4346 e-bikes, each including its subcategories (checked: the same
+  ids as querying all leaves). Volume for 960 items: 4345 reaches 8 weeks back (about 17 a day),
+  4346 12 months, 4347 kids' bikes only 20 hours (about 1000 a day). Near therefore uses 4345 +
+  4346; kids' bikes are left out.
+- No radius search (shipping marketplace): near is the whole country's bike categories, newest
+  first. The domain follows `location.country` (`www.vinted.be`, `www.vinted.nl`).
+- Far search: model (or brand) words within 4333 cycling, so brand words that are also shoe
+  names (Gazelle) do not flood it.
+- No dates on cards, but item ids are one global counter: about 10.8M a day (19 h), 11.5M
+  (8 weeks), 8.3M (12-month average). `since` becomes an id cutoff, newest id on the first near
+  page minus `days x 8M`; the low rate errs toward reading further back.
+- "Newest first" is ordered by bump, like 2dehands: on one page 28 of 95 neighbours were out of
+  id order, with a 4-week-old listing among 3-day-old ones. A bumped listing keeps its old id,
+  so each listing below the cutoff is dropped, but paging stops only at a page with nothing above
+  it (as D11). Zero cards on the first near page raises `Blocked`.
 
 ### Photo score bake-off (2026-10-05)
 
