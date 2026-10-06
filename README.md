@@ -50,7 +50,7 @@ You need Linux or macOS, [uv](https://docs.astral.sh/uv/) and about 3 GB of free
 git clone https://github.com/wiebe-vandendriessche/bikehound.git
 cd bikehound
 uv sync                      # installs Python 3.14 and the dependencies
-uv run playwright install chromium   # only for Vinted
+uv run playwright install chromium   # only for Vinted and Facebook
 ```
 
 ### 2. Create your config
@@ -131,6 +131,28 @@ schedule cannot hammer the marketplaces.
 To test by hand, `run --force` skips that guard and `run --platform vinted` (repeatable)
 searches only the platforms you name. A run limited with `--platform` does not count for the
 guard, so it never makes your scheduled run skip a day.
+
+### Run with Docker instead
+
+Prefer a container? Build the image once, then keep each bike in its own folder (config,
+photos and data live there, outside the image):
+
+```bash
+docker build -t bikehound .
+mkdir mybike
+docker run --rm --user "$(id -u):$(id -g)" -v "$PWD/mybike:/bike" bikehound init
+# edit mybike/config.yaml, put photos in mybike/reference/, then:
+docker run --rm --user "$(id -u):$(id -g)" -v "$PWD/mybike:/bike" bikehound check
+```
+
+The image model is downloaded once into `mybike/data/hf/`. The daily cron line becomes:
+
+```cron
+0 7 * * * docker run --rm --user 1000:1000 -v /path/to/mybike:/bike bikehound run >> /path/to/mybike/data/bikehound.log 2>&1
+```
+
+(use your own `id -u` and `id -g` instead of `1000`). The image runs Chromium headless only;
+`BIKEHOUND_HEADED=1` needs a normal install.
 
 ### When does it stop?
 

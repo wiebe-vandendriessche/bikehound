@@ -49,8 +49,3 @@ hundreds of new listings a day.
 - **Options:** keep the fallback and accept the CPU time, or require at least one model word for
   the far search.
 - **Decided by:** measuring the daily volume for a common brand.
-
-## 8. README update
-
-Bring the README in line with the design: opt-in platforms, `active_until`, Python ≥ 3.14,
-install steps, ntfy setup. Follow-up after the design phase.
