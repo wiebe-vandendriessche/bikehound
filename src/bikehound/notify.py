@@ -3,12 +3,15 @@ import httpx
 from .match import Score
 from .sources import Listing
 
+# the app shows this as the notification icon (PNG or JPEG only)
+ICON = "https://raw.githubusercontent.com/wiebe-vandendriessche/bikehound/main/img/icon-192.png"
+
 
 def _send(
     url: str, body: str, title: str, click: str = "", attach: str = "", tags: str = ""
 ) -> None:
     # headers must be ASCII, so listing text goes in the body only
-    h = {"Title": title, "Tags": tags}
+    h = {"Title": title, "Tags": tags, "Icon": ICON}
     if click:
         h["Click"] = click
     if attach:

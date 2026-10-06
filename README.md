@@ -1,6 +1,16 @@
-# 🐕 BikeHound
+<p align="center">
+  <img src="img/icon.svg" width="160" alt="BikeHound logo: a muzzled police dog in a red and blue shield">
+</p>
 
-**Sniffs out your stolen bike on second-hand marketplaces, every day.**
+<h1 align="center">BikeHound</h1>
+
+<p align="center"><strong>Sniffs out your stolen bike on second-hand marketplaces, every day.</strong></p>
+
+<p align="center">
+  <a href="https://github.com/wiebe-vandendriessche/bikehound/actions/workflows/ci.yml"><img src="https://github.com/wiebe-vandendriessche/bikehound/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-AGPL--3.0-214E8A" alt="License: AGPL-3.0"></a>
+  <img src="https://img.shields.io/badge/python-3.14-DC2D26" alt="Python 3.14">
+</p>
 
 Had your bike stolen? It often shows up for sale online within days or weeks, usually with a
 vague title like *"bike for sale"*, no brand and a single photo. Checking every marketplace by
@@ -11,12 +21,12 @@ your bike, you get a notification on your phone with a photo and a link.
 
 ## Features
 
-- 🔎 Watches several second-hand marketplaces at once
-- 📍 Focuses on your area, without ignoring listings further away
-- 📷 Recognises your bike from its photos, even when the listing says almost nothing
-- 🧩 Still finds your bike when parts like mudguards, stickers or the saddle were changed
-- 📱 Push notifications on your phone
-- 🕗 Runs automatically every day
+- Watches several second-hand marketplaces at once
+- Focuses on your area, without ignoring listings further away
+- Recognises your bike from its photos, even when the listing says almost nothing
+- Still finds your bike when parts like mudguards, stickers or the saddle were changed
+- Push notifications on your phone
+- Runs automatically every day
 
 ## Marketplaces
 
@@ -147,7 +157,7 @@ stops searching. Move the date to keep searching.
   embeddings) are never committed to git. BikeHound stores only listing IDs and scores, never
   texts, photos or seller details.
 
-## ⚠️ Before you use it
+## Before you use it
 
 - **Terms of service**: many marketplaces don't allow automated access. BikeHound is meant for
   personal use. You are responsible for how you use it.
@@ -156,8 +166,11 @@ stops searching. Move the date to keep searching.
 
 ## Contributing
 
-Contributions are welcome. Open an issue or a pull request.
+Contributions are welcome, especially fixes when a marketplace changes and new marketplaces.
+Read [CONTRIBUTING.md](CONTRIBUTING.md) first. Report security problems privately as described
+in [SECURITY.md](SECURITY.md). Everyone taking part follows the
+[Code of Conduct](CODE_OF_CONDUCT.md).
 
 ## License
 
-[GNU AGPL-3.0](LICENSE) © 2026 Wiebe Vandendriessche
+[GNU AGPL-3.0](LICENSE), copyright 2026 Wiebe Vandendriessche

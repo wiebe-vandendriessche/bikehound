@@ -33,3 +33,15 @@ def test_digest_stops_at_failure(monkeypatch):
     monkeypatch.setattr(notify, "_send", send)
     sent = notify.digest("u", hits(120))
     assert 0 < len(sent) < 120 and len(calls) == 2
+
+
+def test_every_message_carries_the_icon(monkeypatch):
+    sent = []
+
+    class Ok:
+        def raise_for_status(self):
+            pass
+
+    monkeypatch.setattr(httpx, "post", lambda url, **kw: sent.append(kw["headers"]) or Ok())
+    notify.failure("u", "vinted", "HTTP 403")
+    assert sent[0]["Icon"] == notify.ICON and notify.ICON.endswith(".png")

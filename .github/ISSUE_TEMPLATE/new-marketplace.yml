@@ -1,0 +1,23 @@
+name: New marketplace
+description: Suggest a marketplace BikeHound should search.
+labels: [marketplace]
+body:
+  - type: input
+    id: site
+    attributes:
+      label: Marketplace and country
+      placeholder: e.g. example-marketplace.de, Germany
+    validations:
+      required: true
+  - type: textarea
+    id: why
+    attributes:
+      label: Why it matters
+      description: Is it a common place to sell second-hand bikes in that country?
+  - type: textarea
+    id: access
+    attributes:
+      label: What you know about access
+      description: >-
+        Does searching work without an account? Does the page load listings as JSON? Any bot
+        protection? BikeHound does not bypass protection or create accounts (see CONTRIBUTING.md).
