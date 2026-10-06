@@ -54,11 +54,23 @@ def frame_hit(listing: Listing, cfg: Config) -> bool:
     return bool(frame) and frame in _alnum(f"{listing.title} {listing.description}")
 
 
+def found(word: str, text: str) -> bool:
+    """Substring match on normalised text, except a number never matches inside a longer
+    number: "28" is not in "280", "1280" or "28.00", nor in "28.5" or "28,5"."""
+    w = norm(word)
+    pattern = re.escape(w)
+    if w[:1].isdigit():
+        pattern = r"(?<![\d.,])" + pattern
+    if w[-1:].isdigit():
+        pattern += r"(?![.,]?\d)"
+    return re.search(pattern, text) is not None
+
+
 def score(listing: Listing, cfg: Config, photo: float = 0.0) -> Score:
     if frame_hit(listing, cfg):
         return Score(total=1.0 + photo, photo=photo, frame_hit=True)
     text = norm(f"{listing.title} {listing.description}")
-    groups = [n for n, g in cfg.keywords.items() if any(norm(w) in text for w in g.words)]
+    groups = [n for n, g in cfg.keywords.items() if any(found(w, text) for w in g.words)]
     total = photo + sum(cfg.keywords[n].weight for n in groups)
     return Score(total=total, photo=photo, groups=groups)
 

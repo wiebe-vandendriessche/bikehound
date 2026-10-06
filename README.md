@@ -22,7 +22,7 @@ your bike, you get a notification on your phone with a photo and a link.
 
 - 2dehands.be
 - Marktplaats.nl
-- Vinted (planned)
+- Vinted (opt-in)
 - Leboncoin (planned)
 - Facebook Marketplace (planned)
 
@@ -40,6 +40,7 @@ You need Linux or macOS, [uv](https://docs.astral.sh/uv/) and about 3 GB of free
 git clone https://github.com/wiebe-vandendriessche/bikehound.git
 cd bikehound
 uv sync                      # installs Python 3.14 and the dependencies
+uv run playwright install chromium   # only for Vinted
 ```
 
 ### 2. Create your config
@@ -62,6 +63,18 @@ Open `config.yaml` and describe your bike. Every field is commented; the importa
 Keyword groups add to the photo score when any of their words appears in the listing:
 `brand` 0.3, `model` 0.4, any other group 0.1 unless you set `weight`. Brand plus model is
 enough to notify on its own; raise the weight of a rare, distinctive colour.
+
+Words match anywhere in the title and description, so pick words that only your bike's
+listings would contain:
+
+- **Avoid short, generic words.** A short word also matches inside longer words and other
+  brands' names. Prefer the full name as a phrase, and add the spellings sellers use (with and
+  without spaces or dashes).
+- **Put the model name in `model`,** not in `brand`.
+- **Numbers match whole numbers only:** `28` does not match `280` or `28.5`, but it still
+  matches every "28 inch" wheel. Use the full model number instead of a bare number.
+- **Check before you run:** `bikehound check` prints how many listings on the first page would
+  notify, how many by keywords alone, and which keyword groups fired.
 
 ### 3. Add photos of your bike
 
@@ -105,6 +118,10 @@ Schedule it with cron (`crontab -e`), for example every morning at 7:
 BikeHound refuses to run again within 12 hours of a successful run, so a misconfigured
 schedule cannot hammer the marketplaces.
 
+To test by hand, `run --force` skips that guard and `run --platform vinted` (repeatable)
+searches only the platforms you name. A run limited with `--platform` does not count for the
+guard, so it never makes your scheduled run skip a day.
+
 ### When does it stop?
 
 On `bike.active_until` (default: one year after the theft) it sends one last notification and
@@ -116,6 +133,9 @@ stops searching. Move the date to keep searching.
   day; the next run tries again. Repeated failures usually mean the site changed.
 - **Too many or too few notifications?** Raise or lower `threshold` in steps of 0.05 and look
   at the scores in `bikehound check` and in the notifications.
+- **Vinted** is searched with BikeHound's own browser profile in `data/profiles/vinted/`,
+  logged out. BikeHound never logs in with your account. If Vinted starts blocking it, try
+  `BIKEHOUND_HEADED=1` (on a server without a screen: under `xvfb-run`).
 - **Several bikes?** Use one config file per bike, each in its own folder, and pass it with
   `uv run bikehound -c path/to/config.yaml run`. Each config gets its own `data/` folder.
 - **Your files:** `config.yaml`, `reference/` and `data/` (seen listings, cached photo

@@ -20,7 +20,13 @@ class Listing:
     posted_at: date | None = None  # bump date, day precision
 
 
-from . import lrp  # after Listing and Blocked, which the sources import
+def far_words(cfg) -> list[str]:
+    """Words for the far (text) search: the model group, else the brand group."""
+    group = cfg.keywords.get("model") or cfg.keywords.get("brand")
+    return group.words if group else []
+
+
+from . import lrp, vinted  # after Listing, Blocked and far_words, which the sources import
 
 # platform name -> search(cfg, since, max_pages=None) -> list[Listing]
-SOURCES: dict = {p: partial(lrp.search, p) for p in lrp.HOSTS}
+SOURCES: dict = {p: partial(lrp.search, p) for p in lrp.HOSTS} | {"vinted": vinted.search}

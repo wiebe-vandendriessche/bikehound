@@ -1,8 +1,10 @@
 from datetime import date
 from pathlib import Path
 
+import pytest
+
 from bikehound.config import Config, Group
-from bikehound.match import photo_score, score
+from bikehound.match import found, photo_score, score
 from bikehound.sources import Listing
 
 
@@ -60,3 +62,24 @@ def test_photo_adds_to_keywords():
     c = cfg()
     s = score(Listing("1", "p", "u", "Cortina fiets"), c, photo=0.5)
     assert abs(s.total - 0.8) < 1e-9 and s.groups == ["brand"]
+
+
+@pytest.mark.parametrize(
+    "word, text, hit",
+    [
+        ("28", "28 inch wielen", True),
+        ("28", "280 euro", False),
+        ("28", "1280", False),
+        ("28", "28.00 eur", False),
+        ("28", "28.5 inch", False),
+        ("28", "28,5 inch", False),
+        ("e u4", "cortina e u4", True),
+        ("e-u4", "cortina e-u4", True),
+        ("e-u4", "e-u45", False),
+        ("groen", "felgroen", True),
+        ("groen", "groene fiets", True),
+        ("Vert", "vtt vert", True),  # the word is normalised, the text already is
+    ],
+)
+def test_numbers_never_match_inside_longer_numbers(word, text, hit):
+    assert found(word, text) is hit

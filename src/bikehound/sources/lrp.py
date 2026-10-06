@@ -6,7 +6,7 @@ from datetime import date, datetime, timedelta
 
 import httpx
 
-from . import Blocked, Listing
+from . import Blocked, Listing, far_words
 
 HOSTS = {"2dehands": ("www.2dehands.be", "BE"), "marktplaats": ("www.marktplaats.nl", "NL")}
 UA = (
@@ -85,11 +85,6 @@ def _pages(fetch, params: list, platform: str, since: date, cap: int) -> list[Li
         if last and last < since:
             break
     return out
-
-
-def far_words(cfg) -> list[str]:
-    group = cfg.keywords.get("model") or cfg.keywords.get("brand")
-    return group.words if group else []
 
 
 def searches(platform: str, cfg) -> list[tuple[str, list, int]]:
