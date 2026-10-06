@@ -22,6 +22,7 @@ def init(args) -> int:
         return 1
     text = files("bikehound").joinpath("config.example.yaml").read_text(encoding="utf-8")
     dest.write_text(text.replace("{topic}", f"bikehound-{secrets.token_hex(12)}"), encoding="utf-8")
+    (dest.parent / "reference").mkdir(exist_ok=True)  # where the README says the photos go
     print(f"Wrote {dest}. Edit it, put photos in reference/, then run `bikehound check`.")
     return 0
 

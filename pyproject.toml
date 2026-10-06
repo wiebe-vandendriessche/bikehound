@@ -5,7 +5,20 @@ description = "Sniffs out your stolen bike on second-hand marketplaces, every da
 readme = "README.md"
 license = "AGPL-3.0-only"
 requires-python = ">=3.14"
+authors = [{ name = "Wiebe Vandendriessche" }]
+keywords = ["stolen bike", "bicycle", "marketplace", "scraper", "ntfy", "self-hosted"]
+classifiers = [
+    "Environment :: Console",
+    "License :: OSI Approved :: GNU Affero General Public License v3",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3.14",
+    "Topic :: Utilities",
+]
 dependencies = ["httpx", "pillow", "playwright", "pyyaml", "torch", "transformers"]
+
+[project.urls]
+Homepage = "https://github.com/wiebe-vandendriessche/bikehound"
+Issues = "https://github.com/wiebe-vandendriessche/bikehound/issues"
 
 [project.scripts]
 bikehound = "bikehound.cli:main"

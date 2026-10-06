@@ -1,0 +1,32 @@
+name: Marketplace stopped working
+description: A marketplace fails, is skipped every run, or suddenly finds nothing.
+labels: [platform]
+body:
+  - type: markdown
+    attributes:
+      value: Never paste your ntfy topic, your config's location or photos of your bike.
+  - type: dropdown
+    id: platform
+    attributes:
+      label: Marketplace
+      options: [2dehands, marktplaats, vinted, facebook]
+    validations:
+      required: true
+  - type: textarea
+    id: failure
+    attributes:
+      label: Failure message
+      description: The text of the "failed" notification, or the status line from `bikehound run`.
+      render: text
+    validations:
+      required: true
+  - type: textarea
+    id: check
+    attributes:
+      label: Output of `uv run bikehound check`
+      render: text
+  - type: input
+    id: since
+    attributes:
+      label: Since when?
+      description: Date of the last run that worked.
