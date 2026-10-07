@@ -57,7 +57,7 @@ def parse(raw: dict, platform: str, ref: date | None = None) -> list[Listing]:
             Listing(
                 id=item["itemId"],
                 platform=platform,
-                url=f"https://{host}{item.get('vipUrl', '')}",
+                url=f"https://{host}/{item['itemId']}",  # short form, redirects to the listing
                 title=item.get("title", ""),
                 description=max(
                     item.get("description", ""),

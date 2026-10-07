@@ -16,10 +16,7 @@ REF = date(2026, 10, 5)
 def test_parse_maps_fields():
     a, b, c, d = parse(RAW, "2dehands", REF)
     assert a.id == "m1000000004"
-    assert (
-        a.url
-        == "https://www.2dehands.be/v/fietsen-en-brommers/elektrische-fietsen/m1000000004-cortina-e-u4"
-    )
+    assert a.url == "https://www.2dehands.be/m1000000004"
     assert a.description.endswith("Ophalen in Gent...")  # the longer of the two
     assert (a.price, a.location, a.posted_at) == ("EUR 1250", "Gent", REF)
     assert a.photo_urls == ["https://images.example.test/a.jpg?rule=83"]

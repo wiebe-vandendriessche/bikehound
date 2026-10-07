@@ -142,7 +142,7 @@ def _run(args, cfg) -> int:
 
     model = load_model()
     refs = reference_embeddings(model, cfg)
-    status, digest, backfilled = {}, [], []
+    status = {}
     for platform in args.platform or cfg.platforms:
         search = SOURCES[platform]
         try:
@@ -175,8 +175,6 @@ def _run(args, cfg) -> int:
                 log.debug("%.2f  %s  %s  %s", s.total, s.reasons(), l.title[:60], l.url)
                 if not s.notify(cfg.threshold):
                     store.record(l.platform, l.id, s.total, False)
-                elif last is None:  # first run for this platform: one digest, not a flood
-                    digest.append((l, s))  # sent together below, recorded once sent
                 else:
                     try:
                         notify.match(cfg.ntfy_url, l, s)
@@ -186,22 +184,12 @@ def _run(args, cfg) -> int:
                         # unrecorded, so the next run retries it
                         log.warning("%s: notification deferred, %s", platform, e)
                         unsent += 1
-        if last is None:
-            backfilled.append(platform)  # marked ok only once its digest is out, see below
-        else:
+        if not unsent:
+            # with deferred notifications, the next run searches the same window again
             store.mark_ok(platform, started)
         status[platform] = f"ok: {len(new)} new" + (
             f", {unsent} notifications deferred" if unsent else ""
         )
-    sent = notify.digest(cfg.ntfy_url, digest) if digest else []
-    for l, s in sent:
-        store.record(l.platform, l.id, s.total, True)
-    if digest:
-        status["digest"] = f"{len(sent)} of {len(digest)} matches sent"
-    if len(sent) == len(digest):
-        # a partly sent digest leaves these unmarked, so the next run backfills the rest again
-        for platform in backfilled:
-            store.mark_ok(platform, started)
     # a run limited with --platform does not count for the 12 h guard, so it never makes the
     # next full (cron) run skip; `since` is per platform, so nothing is searched twice
     summary = "; ".join(f"{k} {v}" for k, v in status.items())
@@ -209,7 +197,7 @@ def _run(args, cfg) -> int:
     log.info("done: %s", summary)
     # nonzero when a platform failed or notifications were deferred, for systemd/Docker
     bad = any(v.startswith("failed") or "deferred" in v for v in status.values())
-    return 1 if bad or len(sent) < len(digest) else 0
+    return 1 if bad else 0
 
 
 def main() -> None:

@@ -1,3 +1,5 @@
+import time
+
 import httpx
 
 from .match import Score
@@ -16,7 +18,15 @@ def _send(
         h["Click"] = click
     if attach:
         h["Attach"] = attach
-    httpx.post(url, content=body.encode(), headers=h, timeout=20).raise_for_status()
+    # ntfy.sh allows a burst of 60, then one message per 5 s; wait instead of dropping
+    # (a first run can find 100+ matches). Still limited after a minute (daily quota): raise,
+    # and the caller defers the listing to the next run.
+    for _ in range(12):
+        r = httpx.post(url, content=body.encode(), headers=h, timeout=20)
+        if r.status_code != 429:
+            break
+        time.sleep(5)
+    r.raise_for_status()
 
 
 def match(url: str, l: Listing, s: Score) -> None:
@@ -29,35 +39,6 @@ def match(url: str, l: Listing, s: Score) -> None:
         l.photo_urls[0] if l.photo_urls else "",
         "dog",
     )
-
-
-MAX_BODY = 4000  # ntfy turns messages over 4096 bytes into attachments
-
-
-def digest(url: str, hits: list[tuple[Listing, Score]]) -> list[tuple[Listing, Score]]:
-    """First run: all hits as a few list messages instead of one push each (ntfy rate limit).
-    Returns the hits that were sent; stops at the first failed message."""
-    hits = sorted(hits, key=lambda h: h[1].total, reverse=True)
-    parts: list[list] = [[]]
-    size = 0
-    for l, s in hits:
-        line = f"{s.total:.2f}  {l.price}  {l.location}  {l.url}\n"
-        if parts[-1] and size + len(line.encode()) > MAX_BODY:
-            parts.append([])
-            size = 0
-        parts[-1].append((l, s, line))
-        size += len(line.encode())
-    sent = []
-    for i, part in enumerate(parts, 1):
-        if not part:
-            continue
-        title = f"BikeHound first run: {len(hits)} possible matches (part {i}/{len(parts)})"
-        try:
-            _send(url, "".join(line for *_, line in part), title, tags="dog")
-        except httpx.HTTPError:
-            break
-        sent += [(l, s) for l, s, _ in part]
-    return sent
 
 
 def failure(url: str, platform: str, why: str) -> None:

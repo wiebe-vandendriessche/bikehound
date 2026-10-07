@@ -1,6 +1,6 @@
 # BikeHound architecture
 
-Status: design agreed 2026-10-05 and implemented: config, store, notify (incl. first-run digest),
+Status: design agreed 2026-10-05 and implemented: config, store, notify,
 text and photo scoring, CLI (`init`, `check`, `run`), the 2dehands/Marktplaats source, the
 browser helper, the Vinted source, the Facebook source (logged out, best effort, D24) and a
 Dockerfile.
@@ -66,8 +66,8 @@ own platform risk.
 | D18 | Tests run on recorded fixtures and pure scoring logic; live checks only via `bikehound check`, never in CI. | Live tests in CI fail on datacenter IPs, not on real breakage. |
 | D19 | Python ≥ 3.14; dependencies: `httpx`, `playwright`, `torch`, `transformers`, `pillow`, `pyyaml`. CLI with `argparse`, config validated with a dataclass. Tooling: `pytest`, `ruff`, `pyproject.toml`. | Most mature ecosystem for browser automation and vision models; no extra layers. |
 | D20 | No background removal or bike cropping. | Measured: a bike-detector crop added about 0.01 AUC on top of SigLIP2 while more than doubling CPU time per photo. |
-| D21 | The first run sends one digest (all matches sorted by score, split into messages under 4000 bytes) instead of one push per match. | A backfill of a popular model produced 121 matches; ntfy.sh rate-limits after about 60 messages. |
-| D22 | `since` and "first run" are tracked per platform (`platform_ok` table). A platform is marked ok only when it was searched without `Blocked`, and on its first run only once its digest is fully sent. | A platform blocked for days, or enabled later, catches up from its own last success instead of searching one day back. |
+| D21 | Every match is its own notification, also on the first run. On HTTP 429, wait 5 s and retry, up to a minute. | A summary message has no photo and a phone shows only its first entry. ntfy.sh allows a burst of 60, then one message per 5 s, so a 121-match backfill takes a few extra minutes instead of losing matches. |
+| D22 | `since` and "first run" are tracked per platform (`platform_ok` table). A platform is marked ok only when it was searched without `Blocked` and every notification was sent. | A platform blocked for days, or enabled later, catches up from its own last success instead of searching one day back. |
 | D23 | Browser sources run on BikeHound's own logged-out profile; BikeHound never logs in to a user's personal account and never creates accounts. | Protects the user's own accounts; account creation is against platform terms (section 1). |
 | D24 | Facebook logged out, best effort: one bikes page per price band (6) plus one text search per far word, in a fixed big-city area per country (`brussels`, `amsterdam`). No account, no login, no backfill, no radius. | A login needs an account and identity checks; logged out, one page is a stale 24-listing sample, but the price-band union covers several days. Partial coverage beats none (section 1). |
 | D25 | Location is `postcode`, `country` and `radius_km`; no coordinates in the config and no client-side radius filter. | Only 2dehands and Marktplaats take a radius, and they apply it server-side; Vinted and Facebook carry no coordinates. Old configs with `lat`/`lon` still load (the keys are ignored). |
@@ -156,8 +156,9 @@ With several bikes, each config file gets its own `data/` folder next to it.
      embed them, take the highest cosine similarity against any reference photo;
    - add the weight of each keyword group with at least one word found in title + description.
 6. **Notify** every listing with `total ≥ threshold`: photo, platform, price, score, matched
-   keywords, link. On the first run all matches go out as a digest instead (D21). A notification that fails (e.g. ntfy.sh rate limit during a large first-run
-   backfill) leaves the listing unrecorded, so the next run retries it.
+   keywords, link. Always one notification per match, also on the first run (D21). A notification
+   still rate-limited after a minute of retries leaves the listing unrecorded and the platform
+   unmarked, so the next run searches the same window and retries it.
 7. **Record.** Write every processed listing to `seen` (with score and notified flag) and the
    run status to `runs`. Prune `seen` rows older than 180 days.
 

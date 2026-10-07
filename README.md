@@ -124,8 +124,8 @@ score against yours, with the best matches, so you can see whether `threshold` f
 uv run bikehound run
 ```
 
-The first run searches back to the theft date and can take 20 to 30 minutes. It sends its
-matches as a few summary messages instead of one notification each. Later runs only look at new
+The first run searches back to the theft date and can take 20 to 30 minutes. Every match,
+on every run, is its own notification. Later runs only look at new
 listings and take a few minutes. Each notification shows the photo, price, score, the reasons
 for the score and a link to the listing.
 
