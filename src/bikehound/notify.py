@@ -4,6 +4,7 @@ import httpx
 
 from .match import Score
 from .sources import Listing
+from .sources.lrp import HOSTS
 
 # the app shows this as the notification icon (PNG or JPEG only)
 ICON = "https://raw.githubusercontent.com/wiebe-vandendriessche/bikehound/main/img/icon-192.png"
@@ -31,6 +32,9 @@ def _send(
 
 def match(url: str, l: Listing, s: Score) -> None:
     body = f"{l.title}\n{l.price} {l.location}\n{s.reasons()} (total {s.total:.2f})"
+    if l.posted_at:
+        # 2dehands and Marktplaats only give the bump date, which can be later than the post date
+        body += f"\n{'bumped' if l.platform in HOSTS else 'posted'} {l.posted_at}"
     _send(
         url,
         body,

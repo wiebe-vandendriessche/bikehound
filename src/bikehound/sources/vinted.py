@@ -87,7 +87,7 @@ def search(cfg, since: date, max_pages: int | None = None, fetch=None) -> list[L
     # cards carry no date, so `since` becomes an id cutoff estimated from the newest id
     host = f"www.vinted.{cfg.country.lower()}"
     if fetch is None:
-        with pages(cfg, "vinted") as get:
+        with pages() as get:
             return search(cfg, since, max_pages, get)
     # no radius on Vinted (shipping marketplace): near is the whole country's bike categories
     runs = [("near", [("catalog[]", c) for c in BIKES], NEAR_PAGES)]

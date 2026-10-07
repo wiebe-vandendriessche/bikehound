@@ -1,5 +1,5 @@
 # --- BikeHound: local data, NEVER commit ---
-# data/ holds the database, cached embeddings and browser profiles (session cookies)
+# data/ holds the database, and cached embeddings
 data/
 !data/.gitkeep
 # Your real configuration (ntfy topic, your bike's description)

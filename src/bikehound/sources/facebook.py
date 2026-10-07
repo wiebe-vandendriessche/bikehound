@@ -63,7 +63,7 @@ def parse(html: str) -> list[Listing]:
 
 def search(cfg, since: date, max_pages: int | None = None, fetch=None) -> list[Listing]:
     if fetch is None:
-        with pages(cfg, "facebook") as get:
+        with pages() as get:
             return search(cfg, since, max_pages, get)
     city = CITY[cfg.country]  # config allows BE and NL only
     found: dict[str, Listing] = {}
@@ -78,12 +78,8 @@ def search(cfg, since: date, max_pages: int | None = None, fetch=None) -> list[L
                         "it were not seen", lo, hi or "", oldest)  # fmt: skip
         found |= {l.id: l for l in batch}
     if not found:
-        # bikes around a capital are never empty: a login wall, a changed page, or a profile
-        # someone logged in to (a logged-in session can be held at a checkpoint)
-        raise Blocked(
-            "no listings: Facebook may require a login now, or data/profiles/facebook/ is "
-            "logged in (delete that folder; this source works logged out)"
-        )
+        # bikes around a capital are never empty: a login wall or a changed page
+        raise Blocked("no listings: Facebook may require a login now")
     # far: text searches are sparse enough for one page each (10 days deep in the spike)
     for w in far_words(cfg):
         url = f"{BASE}/{city}/search?query={quote(w)}&{SORT}"

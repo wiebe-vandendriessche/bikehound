@@ -186,8 +186,9 @@ stops searching. Move the date to keep searching.
   word. It covers recent listings (no search back to the theft date) in a wide area around
   Brussels (`country: BE`) or Amsterdam (`NL`) that Facebook chooses; `radius_km` does not apply.
   If Facebook starts requiring a login, you get a "facebook failed" notification.
-- **Vinted** is searched with BikeHound's own browser profile in `data/profiles/vinted/`,
-  logged out. BikeHound never logs in with your account. If Vinted starts blocking it, try
+- **Vinted and Facebook** are searched with a fresh, empty browser profile every run, logged
+  out and kept in memory only. It is never your own browser and BikeHound never logs in with
+  your account. If Vinted starts blocking it, try
   `BIKEHOUND_HEADED=1` (on a server without a screen: under `xvfb-run`).
 - **Several bikes?** Use one config file per bike, each in its own folder, and pass it with
   `uv run bikehound -c path/to/config.yaml run`. Each config gets its own `data/` folder.

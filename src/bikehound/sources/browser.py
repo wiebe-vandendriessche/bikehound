@@ -1,8 +1,9 @@
-"""A real Chromium on a persistent profile per platform, in data/profiles/<platform>/.
+"""A real Chromium with a fresh, empty, in-memory profile every run (D23).
 
-The profile is BikeHound's own and stays logged out: it never shares cookies with the user's
-browser and BikeHound never logs in. Set BIKEHOUND_HEADED=1 to show the window (e.g. under
-xvfb-run on a server) if a platform starts blocking headless Chromium.
+Playwright's own Chromium, never the user's browser: nothing is written to disk and no
+cookies, logins or history carry over between runs. BikeHound never logs in. Set
+BIKEHOUND_HEADED=1 to show the window (e.g. under xvfb-run on a server) if a platform starts
+blocking headless Chromium.
 """
 
 import os
@@ -18,15 +19,14 @@ HEADLESS = not os.environ.get("BIKEHOUND_HEADED")
 
 
 @contextmanager
-def pages(cfg, platform: str):
+def pages():
     """Yields get(url) -> the page's HTML as the server sent it, visited like a person would."""
     try:
         with sync_playwright() as p:
-            ctx = p.chromium.launch_persistent_context(
-                cfg.data_dir / "profiles" / platform, headless=HEADLESS
-            )
+            browser = p.chromium.launch(headless=HEADLESS)
+            ctx = browser.new_context()  # incognito-like: discarded when the run ends
             try:
-                tab = ctx.pages[0] if ctx.pages else ctx.new_page()
+                tab = ctx.new_page()
 
                 def get(url: str) -> str:
                     time.sleep(random.uniform(2, 5))
@@ -37,7 +37,7 @@ def pages(cfg, platform: str):
 
                 yield get
             finally:
-                ctx.close()
+                browser.close()
     except Error as e:
         # also a missing Chromium: the message says to run `playwright install chromium`
         raise Blocked(f"browser: {e.message.splitlines()[0]}") from e

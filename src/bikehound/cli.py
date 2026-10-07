@@ -75,7 +75,7 @@ def check(args) -> int:
         ok = False
     for platform in cfg.platforms:
         try:
-            found = SOURCES[platform](cfg, today(), max_pages=1)
+            found = after_theft(SOURCES[platform](cfg, today(), max_pages=1), cfg)
         except Exception as e:  # noqa: BLE001, why() logs the traceback
             print(f"{platform}: FAILED, {why(platform, e)}")
             ok = False
@@ -102,6 +102,11 @@ def check(args) -> int:
 
 def today():
     return datetime.now().astimezone().date()
+
+
+def after_theft(listings: list, cfg) -> list:
+    """Drops listings dated before the theft. Undated ones stay: a miss is worse (D12)."""
+    return [l for l in listings if l.posted_at is None or l.posted_at >= cfg.stolen_on]
 
 
 def why(platform: str, e: Exception) -> str:
@@ -155,7 +160,7 @@ def _run(args, cfg) -> int:
                 else max(cfg.stolen_on, last.astimezone().date() - timedelta(days=1))
             )
             log.info("%s: searching since %s", platform, since)
-            listings = search(cfg, since)
+            listings = after_theft(search(cfg, since), cfg)
         except Exception as e:  # noqa: BLE001, why() logs the traceback
             reason = why(platform, e)
             log.warning("%s: failed, %s", platform, reason)

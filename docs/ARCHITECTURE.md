@@ -49,7 +49,7 @@ own platform risk.
 | D1 | Audience: technical users who self-host. | Generic without needing a hosted service. |
 | D2 | One-shot CLI (`bikehound run`), scheduled by the host; a Dockerfile as an alternative install (built locally, not published). | No daemon to keep alive; a home IP has the best chance against bot protection. |
 | D3 | Four marketplaces in v1. 2dehands and Marktplaats on by default; Vinted and Facebook opt-in. | Vinted's and Facebook's terms forbid automated access and both actively block it; the user chooses to take that risk. |
-| D4 | 2dehands/Marktplaats through their shared JSON API over plain HTTP. Vinted and Facebook through Playwright with a real Chromium and a persistent profile per platform. Where the page fetches JSON, the source reads that response instead of scraping selectors. | One browser mechanism for the hard platforms; intercepted JSON breaks less often than CSS selectors. |
+| D4 | 2dehands/Marktplaats through their shared JSON API over plain HTTP. Vinted and Facebook through Playwright with a real Chromium and a fresh in-memory profile every run. Where the page fetches JSON, the source reads that response instead of scraping selectors. | One browser mechanism for the hard platforms; intercepted JSON breaks less often than CSS selectors. |
 | D5 | On a block, CAPTCHA or expired session: skip that platform for this run, notify the user, no retry. | Fail soft and visibly; never escalate. |
 | D6 | One Python module per platform exposing `search()`, registered in a plain dict. | Adding a platform is one file plus one line. No base class, no entry points. |
 | D7 | Photo score from a local image model (SigLIP2-base via `transformers`, CPU-only torch) on the whole photo, cosine similarity, highest pair across the first 3 listing photos x all reference photos. Rescaled so the measured median of unrelated listings (0.55) maps to 0 and their 99th percentile (0.71) to 0.5. Default `threshold` 0.5. | Free, private, works offline; one good photo is enough. Chosen over DINOv2 by a measured bake-off (below). Rescaling keeps the keyword weights meaningful: `brand + model` (0.7) reaches the threshold, `color` alone does not, the photo alone only for about the closest 1% of listings. |
@@ -68,13 +68,14 @@ own platform risk.
 | D20 | No background removal or bike cropping. | Measured: a bike-detector crop added about 0.01 AUC on top of SigLIP2 while more than doubling CPU time per photo. |
 | D21 | Every match is its own notification, also on the first run. On HTTP 429, wait 5 s and retry, up to a minute. | A summary message has no photo and a phone shows only its first entry. ntfy.sh allows a burst of 60, then one message per 5 s, so a 121-match backfill takes a few extra minutes instead of losing matches. |
 | D22 | `since` and "first run" are tracked per platform (`platform_ok` table). A platform is marked ok only when it was searched without `Blocked` and every notification was sent. | A platform blocked for days, or enabled later, catches up from its own last success instead of searching one day back. |
-| D23 | Browser sources run on BikeHound's own logged-out profile; BikeHound never logs in to a user's personal account and never creates accounts. | Protects the user's own accounts; account creation is against platform terms (section 1). |
+| D23 | Browser sources run Playwright's own Chromium with a fresh, empty, in-memory profile every run (`launch()` + `new_context()`, nothing on disk). BikeHound never uses the user's browser or cookies, never logs in to a user's personal account and never creates accounts. | Protects the user's own accounts and keeps no session that could link runs to a person; account creation is against platform terms (section 1). |
 | D24 | Facebook logged out, best effort: one bikes page per price band (6) plus one text search per far word, in a fixed big-city area per country (`brussels`, `amsterdam`). No account, no login, no backfill, no radius. | A login needs an account and identity checks; logged out, one page is a stale 24-listing sample, but the price-band union covers several days. Partial coverage beats none (section 1). |
 | D25 | Location is `postcode`, `country` and `radius_km`; no coordinates in the config and no client-side radius filter. | Only 2dehands and Marktplaats take a radius, and they apply it server-side; Vinted and Facebook carry no coordinates. Old configs with `lat`/`lon` still load (the keys are ignored). |
 | D26 | Silent breakage raises `Blocked`: zero listings on the first near page (2dehands, Marktplaats, Vinted), or all price bands empty (Facebook). | A bike category within a radius, or a whole country's newest bikes, is never empty; zero means a changed page or a block, not a quiet day. |
 | D27 | Page caps: 2dehands/Marktplaats near 50 pages of 100 (the API's 5000-result cap), far 10; Vinted near 10 pages of 96 (the site's cap), far 2; Facebook one page per band or word. The first run backfills only as far as the caps reach. | Polite volume; the measured reach is in the per-platform facts below. |
 | D28 | The far search keeps its fallback to brand words when no `model` group is set; `check` warns about it. | Measured 2026-10-06, brand-only far search, listings bumped today or yesterday: Marktplaats hit the 1000-listing cap for Gazelle and Batavus and found 743 for Cortina; 2dehands 21 to 206. That is minutes of CPU, but brand (0.3) plus a photo score of 0.2 notifies about 5% of them. A far search with lookalikes still beats none. |
 | D29 | Any exception in a source, not only `Blocked`, fails that platform for the run: logged with its traceback, "failed" notification, not marked ok. A bad photo scores 0. Anything else that escapes `run` sends one "run crashed" notification. `run` exits 1 when a platform failed or a notification was deferred. Logging is stdlib `logging` to stderr: `-q` warnings, default info, `-v` debug, `-vv` debug for every library. | A changed page is the usual breakage, and an unattended run that dies silently looks like quiet days. A bad listing must not block its platform on every run. |
+| D30 | Listings dated before `stolen_on` are dropped before scoring; undated ones are kept. The date is the bump date on 2dehands and Marktplaats, `creation_time` on Facebook; Vinted cards carry none (photo file names are random hex, checked 2026-10-07), so only its id cutoff applies. Notifications show the date as `bumped` or `posted`. | A stolen bike cannot be listed before the theft. Bump date >= post date, so the filter never drops a real match. |
 
 ## 3. Components
 
@@ -129,7 +130,6 @@ reference/             the user's photos of the bike
 data/
   bikehound.sqlite     seen + runs
   embeddings/          cached reference embeddings
-  profiles/<platform>/ Playwright browser profiles (contain session cookies)
 ```
 
 With several bikes, each config file gets its own `data/` folder next to it.
@@ -240,7 +240,7 @@ Facts measured on vinted.be on 2026-10-06, logged out, headless Chromium, home I
   first. The domain follows `location.country` (`www.vinted.be`, `www.vinted.nl`).
 - Far search: model (or brand) words within 4333 cycling, so brand words that are also shoe
   names (Gazelle) do not flood it.
-- No dates on cards, but item ids are one global counter: about 10.8M a day (19 h), 11.5M
+- No dates on cards (image file names are random hex, not timestamps), but item ids are one global counter: about 10.8M a day (19 h), 11.5M
   (8 weeks), 8.3M (12-month average). `since` becomes an id cutoff, newest id on the first near
   page minus `days x 8M`; the low rate errs toward reading further back.
 - "Newest first" is ordered by bump, like 2dehands: on one page 28 of 95 neighbours were out of
@@ -311,7 +311,7 @@ search results carry one photo per listing.
 | Risk | Impact | Mitigation |
 |---|---|---|
 | Platform changes its API or page structure | That source returns nothing or fails | Fetch/parse split, fixtures make repair quick; failures are reported to the user, not swallowed. A source that silently returns zero results is the dangerous case (see open questions). |
-| Bot protection (Vinted: Datadome) | Source blocked, sometimes for days | Real browser, persistent profile, home IP, low volume. When blocked: skip and notify. Accept lower coverage. |
+| Bot protection (Vinted: Datadome) | Source blocked, sometimes for days | Real browser, fresh profile per run, home IP, low volume. When blocked: skip and notify. Accept lower coverage. |
 | Headless browsers are easier to detect | More blocks on servers without a display | Document running headed (e.g. under `xvfb-run`) as an option; no stealth tricks. |
 | Facebook closes anonymous access | Facebook source stops | No account is used (D24). All bands empty raises `Blocked`: the user gets a failure notification, the other sources continue. |
 | Terms of service | Automated access is forbidden on several platforms | Personal use only, stated in the README; no circumvention; responsibility lies with the user. |
