@@ -13,7 +13,9 @@ there or sends out. For example:
 
 - the ntfy topic leaking (anyone who knows it can read the notifications);
 - data ending up outside `data/`, in logs, or in a commit;
-- photos, listing texts or seller data being stored or sent anywhere, against the design;
+- photos, descriptions or seller data being stored, or anything being sent anywhere, against the
+  design (the gallery keeps only title, price, town, photo URL and score, locally);
+- listing text breaking out of escaping in `data/matches.html` (script injection);
 - a malicious page or response making BikeHound write files or run code.
 
 A marketplace blocking BikeHound is not a security issue; open a normal issue for that.

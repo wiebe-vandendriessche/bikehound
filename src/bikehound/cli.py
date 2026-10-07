@@ -8,7 +8,7 @@ from pathlib import Path
 
 import httpx
 
-from . import notify, wizard
+from . import notify, report, wizard
 from .config import PLATFORMS, ConfigError, load
 from .match import (
     PHOTO_EXT,
@@ -117,6 +117,19 @@ def why(platform: str, e: Exception) -> str:
     return f"{type(e).__name__}: {e}. The site probably changed; see the log."
 
 
+def gallery(args) -> int:
+    """Rebuilds data/matches.html from the database, without searching."""
+    cfg = load(Path(args.config))
+    db = cfg.data_dir / "bikehound.sqlite"
+    if not db.exists():
+        print(f"No {db} yet: do a `bikehound run` first.")
+        return 1
+    rows = Store(db).listings()
+    report.write(rows, cfg.threshold, cfg.country, cfg.data_dir / "matches.html")
+    print(f"Wrote {cfg.data_dir / 'matches.html'} with {len(rows)} listings.")
+    return 0
+
+
 def run(args) -> int:
     cfg = load(Path(args.config))
     try:
@@ -179,11 +192,11 @@ def _run(args, cfg) -> int:
                 s = score(l, cfg, photo)
                 log.debug("%.2f  %s  %s  %s", s.total, s.reasons(), l.title[:60], l.url)
                 if not s.notify(cfg.threshold):
-                    store.record(l.platform, l.id, s.total, False)
+                    store.record(l, s, False)
                 else:
                     try:
                         notify.match(cfg.ntfy_url, l, s)
-                        store.record(l.platform, l.id, s.total, True)
+                        store.record(l, s, True)
                         log.info("%s: notified %.2f %s", platform, s.total, l.url)
                     except httpx.HTTPError as e:
                         # unrecorded, so the next run retries it
@@ -199,6 +212,10 @@ def _run(args, cfg) -> int:
     # next full (cron) run skip; `since` is per platform, so nothing is searched twice
     summary = "; ".join(f"{k} {v}" for k, v in status.items())
     store.record_run(started, not args.platform, summary)
+    try:
+        report.write(store.listings(), cfg.threshold, cfg.country, cfg.data_dir / "matches.html")
+    except Exception:  # the gallery is a convenience; never fail a run over it
+        log.exception("could not write the match gallery")
     log.info("done: %s", summary)
     # nonzero when a platform failed or notifications were deferred, for systemd/Docker
     bad = any(v.startswith("failed") or "deferred" in v for v in status.values())
@@ -214,7 +231,7 @@ def main() -> None:
         "-v", "--verbose", action="count", default=0, help="-v: debug, -vv: also other libraries"
     )
     sub = p.add_subparsers(dest="cmd", required=True)
-    for name, fn in (("init", init), ("check", check)):
+    for name, fn in (("init", init), ("check", check), ("report", gallery)):
         sub.add_parser(name).set_defaults(fn=fn)
     r = sub.add_parser("run")
     r.set_defaults(fn=run)

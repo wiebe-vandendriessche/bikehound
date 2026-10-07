@@ -39,7 +39,7 @@ own platform risk.
 | LLM or paid API in the matching | Costs per listing and sends photos to a third party; may also reject a true match. |
 | Notification channels other than ntfy | Apprise is the upgrade path if users ask. |
 | Automatic stop on a match | The tool cannot tell a false positive from the real bike. |
-| Storing listing texts, seller data or listing photos | Not needed; data minimisation (GDPR). |
+| Storing descriptions, seller names or listing photos | Not needed; data minimisation (GDPR). The gallery keeps only title, price, town, photo URL and score (D16). |
 | Running on GitHub Actions or other CI as a scraper | Datacenter IPs get blocked; bike photos would leave the user's machine. |
 
 ## 2. Decisions
@@ -61,7 +61,7 @@ own platform risk.
 | D13 | Notifications through ntfy (one HTTP POST, photo attached, link as click action). A random topic is generated at `init`. | Free, open source, self-hostable, no account, no extra dependency. |
 | D14 | Config is a commented YAML file plus a folder of reference photos, written by `init` from a few questions (plain template when stdin is not a terminal). Commands: `init`, `check`, `run` (no `login`: no source needs an account, D23, D24). | Technical users prefer a documented file over a wizard; `check` gives immediate feedback. |
 | D15 | Polite behaviour fixed in code: one sequential pass, page cap per search, random pauses, normal user agent; `run` refuses to start within 12 h of the last successful run. | Protects the user's accounts and IP against a misconfigured cron. |
-| D16 | One SQLite file with only `seen` and `runs`; rows older than 180 days are pruned. | Minimal data, no seller information, stdlib `sqlite3`. |
+| D16 | One SQLite file with `seen`, `runs` and `listings` (title, price, town, photo URL, score, reasons of each scored listing, for the gallery); rows older than 180 days are pruned. | Enough to browse matches, no descriptions, seller names or photo files; stdlib `sqlite3`. |
 | D17 | `active_until` (default: theft date + 1 year) ends the search with one final notification. | Protects against forgotten cron jobs; the human decides when the bike is found. |
 | D18 | Tests run on recorded fixtures and pure scoring logic; live checks only via `bikehound check`, never in CI. | Live tests in CI fail on datacenter IPs, not on real breakage. |
 | D19 | Python ≥ 3.14; dependencies: `httpx`, `playwright`, `torch`, `transformers`, `pillow`, `pyyaml`. CLI with `argparse`, config validated with a dataclass. Tooling: `pytest`, `ruff`, `pyproject.toml`. | Most mature ecosystem for browser automation and vision models; no extra layers. |
@@ -112,7 +112,8 @@ own platform risk.
 | `sources/__init__.py` | `SOURCES = {"2dehands": ..., "marktplaats": ..., ...}` and the `Listing` dataclass (id, platform, url, title, description, price, location, photo URLs, posted_at). |
 | `match.py` | Loads the model, computes and caches reference embeddings (keyed by file hash), scores each listing: photo score, keyword bonus, frame-number hit. Returns the score and the reasons for it. |
 | `notify.py` | Sends four message kinds to ntfy: possible match, platform failure, run crashed, search stopped. |
-| `store.py` | SQLite access: `seen` (platform, listing_id, first_seen, score, notified), `runs` (started_at, per-platform status). Pruning and the 12-hour guard. |
+| `store.py` | SQLite access: `seen` (platform, listing_id, first_seen, score, notified), `runs` (started_at, per-platform status), `listings` (gallery details). Pruning and the 12-hour guard. |
+| `report.py` | Writes `data/matches.html` after each run: a static, self-contained card gallery of `listings` with a score slider. |
 
 ### Commands
 
@@ -128,7 +129,8 @@ own platform risk.
 config.yaml            the user's configuration
 reference/             the user's photos of the bike
 data/
-  bikehound.sqlite     seen + runs
+  bikehound.sqlite     seen + runs + listings
+  matches.html         the match gallery, rewritten each run
   embeddings/          cached reference embeddings
 ```
 
@@ -320,7 +322,7 @@ search results carry one photo per listing.
 | `torch` wheels lag behind new Python versions | Install fails on the newest Python | Pin the supported version in `pyproject.toml` and the Docker image. |
 | Image model sees "similar bike", not "my bike" | Many false positives for common models | Low threshold is intentional; notifications show the score and reasons. An LLM re-ranker is the upgrade path if volume becomes a burden. |
 | ntfy.sh topics are public by name | Anyone who guesses the topic sees the notifications | Long random topic; self-hosting ntfy is documented. |
-| Seller personal data | GDPR exposure | Only IDs and scores are stored; no texts, names or photos. |
+| Seller personal data | GDPR exposure | Only what the gallery needs (title, price, town, photo URL, score), pruned after 180 days; no descriptions, seller names or photo files. |
 
 ## 7. Open questions
 

@@ -11,7 +11,19 @@ CREATE TABLE IF NOT EXISTS seen (
   PRIMARY KEY (platform, listing_id));
 CREATE TABLE IF NOT EXISTS runs (
   started_at TEXT, finished_ok INTEGER, status TEXT);
+-- what the gallery (report.py) shows; separate from seen so existing databases need no migration
+CREATE TABLE IF NOT EXISTS listings (
+  platform TEXT, listing_id TEXT, first_seen TEXT, score REAL, notified INTEGER, url TEXT,
+  title TEXT, price TEXT, location TEXT, photo TEXT, posted_at TEXT, reasons TEXT,
+  PRIMARY KEY (platform, listing_id));
 CREATE TABLE IF NOT EXISTS platform_ok (platform TEXT PRIMARY KEY, last_ok TEXT);
+"""
+
+LISTINGS = """
+SELECT s.platform, s.listing_id, s.first_seen, s.score, s.notified, coalesce(l.url, '') url,
+  coalesce(l.title, '') title, coalesce(l.price, '') price, coalesce(l.location, '') location,
+  coalesce(l.photo, '') photo, coalesce(l.posted_at, '') posted_at, coalesce(l.reasons, '') reasons
+FROM seen s LEFT JOIN listings l USING (platform, listing_id) ORDER BY s.score DESC
 """
 
 
@@ -29,12 +41,24 @@ class Store:
         q = "SELECT 1 FROM seen WHERE platform=? AND listing_id=?"
         return self.db.execute(q, (platform, listing_id)).fetchone() is not None
 
-    def record(self, platform: str, listing_id: str, score: float, notified: bool) -> None:
+    def record(self, l, s, notified: bool) -> None:
+        """l: Listing, s: Score."""
+        key = (l.platform, l.id, now().isoformat(), s.total, int(notified))
+        self.db.execute("INSERT OR IGNORE INTO seen VALUES (?,?,?,?,?)", key)
         self.db.execute(
-            "INSERT OR IGNORE INTO seen VALUES (?,?,?,?,?)",
-            (platform, listing_id, now().isoformat(), score, int(notified)),
-        )
+            "INSERT OR IGNORE INTO listings VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
+            key + (l.url, l.title, l.price, l.location, l.photo_urls[0] if l.photo_urls else "",
+                   str(l.posted_at or ""), s.reasons()),
+        )  # fmt: skip
         self.db.commit()
+
+    def listings(self) -> list[sqlite3.Row]:
+        self.db.row_factory = sqlite3.Row
+        try:
+            # from seen, so listings scored before the listings table existed show up too
+            return self.db.execute(LISTINGS).fetchall()
+        finally:
+            self.db.row_factory = None
 
     def last_ok_run(self) -> datetime | None:
         row = self.db.execute("SELECT max(started_at) FROM runs WHERE finished_ok=1").fetchone()
@@ -46,7 +70,9 @@ class Store:
 
     def record_run(self, started: datetime, ok: bool, status: str) -> None:
         self.db.execute("INSERT INTO runs VALUES (?,?,?)", (started.isoformat(), int(ok), status))
-        self.db.execute("DELETE FROM seen WHERE first_seen < ?", ((now() - KEEP).isoformat(),))
+        cutoff = ((now() - KEEP).isoformat(),)
+        self.db.execute("DELETE FROM seen WHERE first_seen < ?", cutoff)
+        self.db.execute("DELETE FROM listings WHERE first_seen < ?", cutoff)
         self.db.commit()
 
     def last_ok(self, platform: str) -> datetime | None:

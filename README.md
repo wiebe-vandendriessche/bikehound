@@ -147,6 +147,15 @@ page fetched and every listing's score, `-vv` also every HTTP request. A platfor
 for whatever reason, is skipped for that run with a "failed" notification; the others still run.
 If the run itself crashes you get a "run crashed" notification. Either way the exit code is 1.
 
+### Browse all matches
+
+After every run, open `data/matches.html` in a browser. It shows every listing that was
+scored, best first. By default you see only the listings that sent a notification. Drag the
+score slider down to see the near misses below your `threshold` too.
+
+To rebuild the page from what is already in `data/` without searching, run
+`uv run bikehound report`.
+
 ### Run with Docker instead
 
 Prefer a container? Build the image once, then keep each bike in its own folder (config,
@@ -193,8 +202,9 @@ stops searching. Move the date to keep searching.
 - **Several bikes?** Use one config file per bike, each in its own folder, and pass it with
   `uv run bikehound -c path/to/config.yaml run`. Each config gets its own `data/` folder.
 - **Your files:** `config.yaml`, `reference/` and `data/` (seen listings, cached photo
-  embeddings) are never committed to git. BikeHound stores only listing IDs and scores, never
-  texts, photos or seller details.
+  embeddings, the gallery) are never committed to git. For the gallery, BikeHound stores the
+  title, price, town, photo link and score of each listing for 180 days; never descriptions,
+  photo files or seller names.
 
 ## Before you use it
 

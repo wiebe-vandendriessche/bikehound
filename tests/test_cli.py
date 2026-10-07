@@ -2,6 +2,7 @@ from argparse import Namespace
 from datetime import date
 
 from bikehound import cli, notify
+from bikehound.match import Score
 from bikehound.sources import Listing
 from bikehound.store import Store
 
@@ -36,6 +37,7 @@ def test_broken_platform_does_not_stop_the_others(tmp_path, monkeypatch):
     store = Store(tmp_path / "data" / "bikehound.sqlite")
     assert store.is_seen("marktplaats", "1")
     assert store.last_ok("2dehands") is None
+    assert "https://x.test/1" in (tmp_path / "data" / "matches.html").read_text()
 
 
 def test_listings_dated_before_the_theft_are_dropped(tmp_path, monkeypatch):
@@ -61,3 +63,13 @@ def test_listings_dated_before_the_theft_are_dropped(tmp_path, monkeypatch):
         True,
         True,
     ]
+
+
+def test_report_rebuilds_the_gallery_without_a_run(tmp_path, capsys):
+    (tmp_path / "config.yaml").write_text(CONFIG)
+    args = Namespace(config=tmp_path / "config.yaml")
+    assert cli.gallery(args) == 1  # no database yet
+    l = Listing("1", "marktplaats", "https://x.test/1", "a bike")
+    Store(tmp_path / "data" / "bikehound.sqlite").record(l, Score(0.7), True)
+    assert cli.gallery(args) == 0
+    assert "https://x.test/1" in (tmp_path / "data" / "matches.html").read_text()

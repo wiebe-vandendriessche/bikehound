@@ -32,6 +32,16 @@ from . import (
     vinted,
 )  # after Listing, Blocked and far_words, which the sources import
 
+
+def listing_url(platform: str, listing_id: str, country: str) -> str:
+    """The listing's link from its ID alone; each redirects to the full listing page."""
+    if platform in lrp.HOSTS:
+        return f"https://{lrp.HOSTS[platform][0]}/{listing_id}"
+    if platform == "vinted":
+        return f"https://www.vinted.{country.lower()}/items/{listing_id}"
+    return f"{facebook.BASE}/item/{listing_id}/"
+
+
 # platform name -> search(cfg, since, max_pages=None) -> list[Listing]
 SOURCES: dict = {p: partial(lrp.search, p) for p in lrp.HOSTS} | {
     "vinted": vinted.search,
