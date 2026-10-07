@@ -4,6 +4,7 @@ import os
 from html import escape
 from pathlib import Path
 
+from .notify import ICON
 from .sources import listing_url
 
 PAGE = """<!doctype html>
@@ -11,12 +12,13 @@ PAGE = """<!doctype html>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="referrer" content="no-referrer">
 <title>BikeHound matches</title>
+<link rel="icon" href="{icon}">
 <style>
 :root {{ color-scheme: light dark; --bg: #f6f6f4; --card: #fff; --muted: #666; --hit: #c2410c; }}
 @media (prefers-color-scheme: dark) {{ :root {{ --bg: #161616; --card: #222; --muted: #aaa; }} }}
 body {{ margin: 0; padding: 16px; font: 15px/1.4 system-ui, sans-serif; background: var(--bg); }}
 header {{ display: flex; flex-wrap: wrap; gap: 8px 24px; align-items: center; margin-bottom: 16px; }}
-h1 {{ font-size: 20px; margin: 0; }}
+h1 {{ font-size: 20px; margin: 0; display: flex; align-items: center; gap: 8px; }}
 .grid {{ display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); }}
 .card {{ background: var(--card); border-radius: 8px; overflow: hidden; color: inherit;
   text-decoration: none; display: flex; flex-direction: column; }}
@@ -27,7 +29,7 @@ h1 {{ font-size: 20px; margin: 0; }}
 .notified .score {{ color: var(--hit); font-weight: 600; }}
 [hidden] {{ display: none; }}
 </style></head><body>
-<header><h1>BikeHound matches</h1>
+<header><h1><img src="{icon}" width="40" height="40" alt="">BikeHound matches</h1>
 <label>Min score <input id="min" type="range" min="0" max="{top}" step="0.05" value="{threshold}">
 <output id="val">{threshold}</output></label>
 <label><input id="only" type="checkbox"> notified only</label>
@@ -84,7 +86,7 @@ def card(r, country: str) -> str:
 
 def write(rows: list, threshold: float, country: str, path: Path) -> None:
     top = max([threshold, *(r["score"] for r in rows)]) + 0.05
-    html = PAGE.format(top=f"{top:.2f}", threshold=f"{threshold:.2f}",
+    html = PAGE.format(icon=ICON, top=f"{top:.2f}", threshold=f"{threshold:.2f}",
                        cards="\n".join(card(r, country) for r in rows))  # fmt: skip
     tmp = path.with_suffix(".tmp")
     tmp.write_text(html, encoding="utf-8")
